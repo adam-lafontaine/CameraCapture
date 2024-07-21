@@ -9,7 +9,7 @@
 #define STBI_NO_JPEG
 
 //#define STBI_NO_PNG
-//#define STBI_NO_BMP
+#define STBI_NO_BMP
 //#define STBI_NO_SIMD
 //#define STBI_NEON
 
