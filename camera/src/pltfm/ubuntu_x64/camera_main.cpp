@@ -1,20 +1,31 @@
 #include "../../imgui_sdl_ogl/imgui_include.hpp"
-#include "../../../../libs/sdl/sdl.cpp"
+#include "../../../../libs/sdl/sdl_include.hpp"
+#include "../../../../libs/util/stopwatch.hpp"
 #include "../../input_display/input_display.hpp"
+
+#include <thread>
 
 
 namespace img = image;
 namespace idsp = input_display;
 
 
+constexpr f64 NANO = 1'000'000'000;
+constexpr f64 MICRO = 1'000'000;
+
+constexpr f64 TARGET_FRAMERATE_HZ = 60.0;
+constexpr f64 TARGET_NS_PER_FRAME = NANO / TARGET_FRAMERATE_HZ;
+
+
+
 static void set_game_window_icon(SDL_Window* window)
 {
-#include "../../../resources/icon_64.c" // this will "paste" the struct my_icon into this function
+#include "../../../../resources/icon_64.c" // this will "paste" the struct my_icon into this function
     sdl::set_window_icon(window, icon_64);
 }
 
 
-static void process_input(sdl::EventInfo& evt, input::Input const& prev, input::Input& curr, ui::UIState& state)
+static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, input::Input& curr, ui::UIState& state)
 {
     //auto& io = *state.io;
 
@@ -43,9 +54,6 @@ enum class RunState : int
 {
     Begin,
     Run,
-    Pause,
-    Error,
-    Reset,
     End
 };
 
@@ -61,14 +69,21 @@ namespace
 
     idsp::IOState io_state{};
 
+    img::Buffer32 camera_buffer;
+
     constexpr u32 N_OGL_TEXTURES = 2;
+    constexpr ogl::TextureId input_display_texture_id = { 0 };
+    constexpr ogl::TextureId camera_texture_id = { 1 };
     ogl::TextureList<N_OGL_TEXTURES> textures;
 
     ui::UIState ui_state{};
     SDL_Window* window = 0;
     SDL_GLContext gl_context;
     
-    RunState run_state = RunState::Begin;    
+    RunState run_state = RunState::Begin;
+
+    Stopwatch main_sw;
+    f64 main_frame_ns;
 }
 
 
@@ -81,6 +96,14 @@ static void end_program()
 static bool is_running()
 {
     return run_state != RunState::End;
+}
+
+
+static void init_input()
+{
+    sdl::open_game_controllers(sdl_controller, user_input[0]);
+    user_input[1].num_controllers = user_input[0].num_controllers;
+    user_input[0].frame = user_input[1].frame = (u64)0 - 1;
 }
 
 
@@ -101,6 +124,21 @@ static bool run_state_changed()
     bool updated = false;
 
     return updated;
+}
+
+
+static void wait_for_framerate()
+{
+    constexpr f64 fudge = 0.9;
+
+    main_frame_ns = main_sw.get_time_nano();
+    auto sleep_ns = TARGET_NS_PER_FRAME - main_frame_ns;
+    if (sleep_ns > 0.0)
+    {
+        std::this_thread::sleep_for(std::chrono::nanoseconds((i64)(sleep_ns * fudge)));
+    }
+
+    main_sw.start();
 }
 
 
@@ -156,6 +194,8 @@ static void handle_window_event(SDL_Event const& event, SDL_Window* window)
 
 static void process_user_input()
 {
+    swap_inputs();
+
     auto& input = user_input[input_id_curr];
     auto& input_prev = user_input[input_id_prev];
 
@@ -178,9 +218,9 @@ static void process_user_input()
 
     input::process_controller_input(sdl_controller, input_prev, input);
 
-    process_input(evt, input_prev, input, ui_state);
+    ui_process_input(evt, input_prev, input, ui_state);
 
-    swap_inputs();
+    
 }
 
 
@@ -222,6 +262,18 @@ static void render_imgui_frame()
 }
 
 
+static void render_input_display(img::ImageView const& src)
+{
+    ogl::render_to_texture(src.matrix_data_, (int)src.width, (int)src.height, input_display_texture_id);
+}
+
+
+static void render_camera_screen(img::ImageView const& src)
+{
+    ogl::render_to_texture(src.matrix_data_, (int)src.width, (int)src.height, camera_texture_id);
+}
+
+
 static bool main_init()
 {
     if(!sdl::init())
@@ -248,9 +300,7 @@ static bool main_init()
 
     set_game_window_icon(window);
 
-    sdl::open_game_controllers(sdl_controller, user_input[0]);
-    user_input[1].num_controllers = user_input[0].num_controllers;
-    user_input[0].frame = user_input[1].frame = (u64)0 - 1;        
+    init_input();        
 
     gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(window, gl_context);
@@ -287,6 +337,84 @@ static bool main_init()
     }
 
     // TODO init camera app
+    //img::create_buffer(camera_buffer)
 
     return true;
 }
+
+
+static void main_close()
+{  
+    //gs::close();
+    idsp::close(io_state);
+    
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+    SDL_GL_DeleteContext(gl_context);
+
+    sdl::close_game_controllers(sdl_controller, user_input[0]);
+    sdl::close();
+
+    //img::destroy_image(game_screen); 
+}
+
+
+static void main_loop()
+{
+#ifndef NDEBUG
+    auto& io = *ui_state.io;
+#endif
+
+    //auto game_view = img::make_view(camera_image);
+
+    main_sw.start();
+    
+    while(is_running())
+    {
+        process_user_input();
+
+        if (run_state_changed())
+        {
+            return;
+        }
+
+        auto& input = user_input[input_id_curr];
+        
+        idsp::update(input, io_state);
+
+        //camera_sw.start();
+        //gs::update(input);
+        //ui_state.app_frame_ns = camera_sw.get_time_nano();
+
+        render_imgui_frame();
+        //ogl::render_game_screen(game_view, textures);
+        render_input_display(io_state.display);
+
+        // cap frame rate
+        wait_for_framerate();
+    }
+}
+
+
+int main()
+{
+    if (!main_init())
+    {
+        return EXIT_FAILURE;
+    }
+
+    run_state = RunState::Run;
+
+    while (is_running())
+    {
+        main_loop();
+    }
+
+    main_close();
+
+    return EXIT_SUCCESS;
+}
+
+
+#include "../../../../libs/sdl/sdl_input.cpp"

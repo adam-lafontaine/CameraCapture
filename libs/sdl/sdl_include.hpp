@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../input/input.hpp"
-#include "../output/image.hpp"
+#include "../image/image.hpp"
 
 
 #if defined(_WIN32)

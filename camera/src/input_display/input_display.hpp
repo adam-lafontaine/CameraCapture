@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../../libs/input/input.hpp"
-#include "../../../libs/output/image.hpp"
+#include "../../../libs/image/image.hpp"
 
 
 

@@ -2,10 +2,10 @@
 
 #include "imgui_options.hpp"
 
-#include "../../../../libs/imgui/imgui.h"
+#include "../../../libs/imgui/imgui.h"
 
-#include "../../../../libs/imgui/backends/imgui_impl_sdl2.h"
-#include "../../../../libs/imgui/backends/imgui_impl_opengl3.h"
+#include "../../../libs/imgui/backends/imgui_impl_sdl2.h"
+#include "../../../libs/imgui/backends/imgui_impl_opengl3.h"
 
 #include <SDL.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -183,7 +183,7 @@ namespace ui
 
 namespace ui
 {
-    static inline SDL_Window* create_sdl_ogl_window(cstr title, int width, int height)
+    static inline SDL_Window* create_sdl_ogl_window(const char* title, int width, int height)
     {
         // Create window with graphics context
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
