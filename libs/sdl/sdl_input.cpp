@@ -340,6 +340,7 @@ namespace input
 
 
 /* mouse */
+
 namespace input
 {
     static void record_mouse_button_input(Uint8 button_code, MouseInput const& old_mouse, MouseInput& new_mouse, bool is_down)
@@ -564,7 +565,6 @@ namespace input
         record_controller_axis_input(sdl_controller, new_controller);        
     }
 }
-
 
 
 /* api */

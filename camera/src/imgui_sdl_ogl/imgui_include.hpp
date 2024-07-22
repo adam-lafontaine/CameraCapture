@@ -15,12 +15,100 @@
 #endif
 
 
+/* opengl */
+
+namespace ogl
+{
+    static inline const char* get_glsl_version()
+    {
+        // Decide GL+GLSL versions
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+        // GL ES 2.0 + GLSL 100
+        static constexpr const char* glsl_version = "#version 100";
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#elif defined(__APPLE__)
+        // GL 3.2 Core + GLSL 150
+        static constexpr const char* glsl_version = "#version 150";
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#else
+        // GL 3.0 + GLSL 130
+        static constexpr const char* glsl_version = "#version 130";
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#endif
+
+        return glsl_version;
+    }
+
+
+    struct TextureId { int value = -1; };
+
+
+    template <size_t N>
+    class TextureList
+    {
+    public:
+        static constexpr size_t count = N;
+
+        GLuint data[count] = { 0 };
+    };
+
+
+    template <size_t N>
+    static inline TextureList<N> create_textures()
+    {
+        TextureList<N> textures{};
+
+        glGenTextures((GLsizei)N, textures.data);
+
+        for (int i = 0; i < textures.count; i++)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, textures.data[i]);
+
+            // Setup filtering parameters for display
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+        }
+        
+        return textures;
+    }
+
+
+    template <typename P>
+    static inline void render_to_texture(P* data, int width, int height, TextureId texture)
+    {
+        static_assert(sizeof(P) == 4);
+
+        assert(texture.value >= 0);
+
+        glActiveTexture(GL_TEXTURE0 + texture.value);
+
+#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+#endif
+        glTexImage2D(
+            GL_TEXTURE_2D, 0, GL_RGBA, 
+            (GLsizei)width, 
+            (GLsizei)height,
+            0, GL_RGBA, GL_UNSIGNED_BYTE, 
+            (GLvoid*)data);
+    }
+}
+
+
 namespace ui
 {
-    void set_imgui_style();
-
-
-
     class UIState
     {
     public:
@@ -93,96 +181,56 @@ namespace ui
 }
 
 
-namespace ogl
+namespace ui
 {
-    static inline const char* get_glsl_version()
+    static inline SDL_Window* create_sdl_ogl_window(cstr title, int width, int height)
     {
-        // Decide GL+GLSL versions
-    #if defined(IMGUI_IMPL_OPENGL_ES2)
-        // GL ES 2.0 + GLSL 100
-        static constexpr const char* glsl_version = "#version 100";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-    #elif defined(__APPLE__)
-        // GL 3.2 Core + GLSL 150
-        static constexpr const char* glsl_version = "#version 150";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-    #else
-        // GL 3.0 + GLSL 130
-        static constexpr const char* glsl_version = "#version 130";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-    #endif
+        // Create window with graphics context
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-        return glsl_version;
+        SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        SDL_Window* window = 
+            SDL_CreateWindow(
+                title, 
+                SDL_WINDOWPOS_CENTERED, 
+                SDL_WINDOWPOS_CENTERED, 
+                width, 
+                height, 
+                window_flags);
+
+        return window;
     }
 
 
-    template <size_t N>
-    class TextureList
+    static inline void set_imgui_style()
     {
-    public:
-        static constexpr size_t count = N;
+        // Load Fonts
+        // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+        // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
+        // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
+        // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+        // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
+        // - Read 'docs/FONTS.md' for more instructions and details.
+        // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
+        // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. See Makefile.emscripten for details.
+        //io.Fonts->AddFontDefault();
+        //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
+        //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
+        //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
+        //IM_ASSERT(font != nullptr);
 
-        GLuint data[count] = { 0 };
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        //ImGui::StyleColorsLight();
 
-    };
+        constexpr auto TEXT_WHITE = ImVec4(0.7f, 0.7f, 0.7f, 1);
 
-
-    struct TextureId { int value = -1; };
-
-
-
-    template <size_t N>
-    static inline TextureList<N> create_image_textures()
-    {
-        TextureList<N> textures{};
-
-        glGenTextures((GLsizei)N, textures.data);
-
-        for (int i = 0; i < textures.count; i++)
-        {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textures[i]);
-
-            // Setup filtering parameters for display
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-        }
-        
-        return textures;
-    }
-
-
-    template <typename P>
-    static inline void render_to_texture(P* data, int width, int height, TextureId texture)
-    {
-        static_assert(sizeof(P) == 4);
-
-        if (texture.value < 0)
-        {
-            return;
-        }
-
-        glActiveTexture(GL_TEXTURE0 + texture.value);
-
-        #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    #endif
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA, 
-            (GLsizei)width, 
-            (GLsizei)height,
-            0, GL_RGBA, GL_UNSIGNED_BYTE, 
-            (GLvoid*)data);
+        auto& style = ImGui::GetStyle();
+        style.Colors[ImGuiCol_Text] = TEXT_WHITE;
+        style.TabRounding = 0.0f;
     }
 }
