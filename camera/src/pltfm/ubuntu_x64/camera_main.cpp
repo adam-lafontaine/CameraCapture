@@ -1,5 +1,6 @@
 #include "../../imgui_sdl_ogl/imgui_include.hpp"
 #include "../../input_display/input_display.hpp"
+#include "../../diagnostics/diagnostics.hpp"
 #include "../../../../libs/sdl/sdl_include.hpp"
 #include "../../../../libs/util/stopwatch.hpp"
 
@@ -72,6 +73,16 @@ static void ui_camera_window(GLuint texture, u32 width, u32 height, f32 scale)
     ImGui::Begin("Camera");
 
     ImGui::Image((void*)(intptr_t)texture, ImVec2(w, h));
+
+    ImGui::End();
+}
+
+
+static void ui_diagnostics_window()
+{
+    ImGui::Begin("Diagnostics");
+
+    diagnostics::show_memory();
 
     ImGui::End();
 }
@@ -275,6 +286,8 @@ static void render_imgui_frame()
     ui_input_window(textures.data[input_texture_id.value], io_state.display.width, io_state.display.height, 2.0f);
     ui_camera_window(textures.data[camera_texture_id.value], camera_view.width, camera_view.height, 1.0f);
 
+    ui_diagnostics_window();
+
     ImGui::Render();
     
     glClear(GL_COLOR_BUFFER_BIT);
@@ -459,3 +472,4 @@ int main()
 #include "../../../../libs/sdl/sdl_input.cpp"
 #include "../../../../libs/span/span.cpp"
 #include "../../../../libs/stb_image/stb_image_options.hpp"
+#include "../../diagnostics/diagnostics.cpp"
