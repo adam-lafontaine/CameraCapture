@@ -21,8 +21,8 @@ src    := $(camera)/src
 
 pltfm := $(src)/pltfm/ubuntu_x64
 
-imgui := $(src)/imgui_sdl_ogl
-input_display := $(src)/input_display
+
+
 
 libs := $(root)/libs
 
@@ -48,6 +48,7 @@ sdl        := $(libs)/sdl
 
 #*** imgui ***
 
+imgui := $(src)/imgui_sdl_ogl
 imgui_options_h := $(imgui)/imgui_options.hpp
 
 imgui_include_h := $(imgui)/imgui_include.hpp
@@ -166,9 +167,21 @@ sdl_input_c += $(numeric_h)
 
 #*** input_display ***
 
+input_display := $(src)/input_display
+
 input_display_h := $(input_display)/input_display.hpp
 input_display_h += $(input_h)
 input_display_h += $(image_h)
+
+#***************
+
+
+#*** diagnostics ***
+
+diagnostics := $(src)/diagnostics
+
+diagnostics_h := $(diagnostics)/diagnostics.hpp
+diagnostics_c := $(diagnostics)/diagnostics.cpp
 
 #***************
 
@@ -195,6 +208,8 @@ main_dep += $(qsprintf)
 main_dep += $(span_c)
 main_dep += $(stb_image_options_h)
 main_dep += $(sdl_input_c)
+main_dep += $(diagnostics_h)
+main_dep += $(diagnostics_c)
 
 #****************
 
