@@ -5,6 +5,8 @@
 #include <cassert>
 #include <array>
 
+#include <cstdio>
+
 
 namespace img = image;
 namespace sp = span;
@@ -107,7 +109,7 @@ namespace input_display
             d_range.x_end += width;
             d_range.y_end = height;
 
-            auto s_view = img::sub_view(ch_filter, img::make_range(width, height));
+            auto s_view = img::sub_view(ch_filter, img::make_rect(width, height));
             auto d_view = img::sub_view(dst, d_range);
             
             img::transform(s_view, d_view, mask_char);
@@ -233,26 +235,26 @@ namespace input_display
     {
         auto& view = controller.filter;
 
-        controller.btn_dpad_up    = img::sub_view(view, img::to_rect(22, 33,  9, 16));
-        controller.btn_dpad_down  = img::sub_view(view, img::to_rect(22, 60,  9, 16));
-        controller.btn_dpad_left  = img::sub_view(view, img::to_rect( 5, 50, 16,  9));
-        controller.btn_dpad_right = img::sub_view(view, img::to_rect(32, 50, 16,  9));
+        controller.btn_dpad_up    = img::sub_view(view, img::make_rect(22, 33,  9, 16));
+        controller.btn_dpad_down  = img::sub_view(view, img::make_rect(22, 60,  9, 16));
+        controller.btn_dpad_left  = img::sub_view(view, img::make_rect( 5, 50, 16,  9));
+        controller.btn_dpad_right = img::sub_view(view, img::make_rect(32, 50, 16,  9));
 
-        controller.btn_a = img::sub_view(view, img::to_rect(159, 63, 13, 13));
-        controller.btn_b = img::sub_view(view, img::to_rect(174, 48, 13, 13));
-        controller.btn_x = img::sub_view(view, img::to_rect(144, 48, 13, 13));
-        controller.btn_y = img::sub_view(view, img::to_rect(159, 33, 13, 13));
+        controller.btn_a = img::sub_view(view, img::make_rect(159, 63, 13, 13));
+        controller.btn_b = img::sub_view(view, img::make_rect(174, 48, 13, 13));
+        controller.btn_x = img::sub_view(view, img::make_rect(144, 48, 13, 13));
+        controller.btn_y = img::sub_view(view, img::make_rect(159, 33, 13, 13));
 
-        controller.btn_start = img::sub_view(view, img::to_rect(103, 24, 14, 7));
-        controller.btn_back  = img::sub_view(view, img::to_rect( 75, 24, 14, 7));
+        controller.btn_start = img::sub_view(view, img::make_rect(103, 24, 14, 7));
+        controller.btn_back  = img::sub_view(view, img::make_rect( 75, 24, 14, 7));
 
-        controller.btn_sh_left  = img::sub_view(view, img::to_rect( 18, 22, 17,  7));
-        controller.btn_sh_right = img::sub_view(view, img::to_rect(157, 22, 17, 7));
-        controller.btn_tr_left  = img::sub_view(view, img::to_rect( 18,  5, 17, 13));
-        controller.btn_tr_right = img::sub_view(view, img::to_rect(157,  5, 17, 13));
+        controller.btn_sh_left  = img::sub_view(view, img::make_rect( 18, 22, 17,  7));
+        controller.btn_sh_right = img::sub_view(view, img::make_rect(157, 22, 17, 7));
+        controller.btn_tr_left  = img::sub_view(view, img::make_rect( 18,  5, 17, 13));
+        controller.btn_tr_right = img::sub_view(view, img::make_rect(157,  5, 17, 13));
 
-        controller.btn_st_left  = img::sub_view(view, img::to_rect( 60, 45, 23, 23));
-        controller.btn_st_right = img::sub_view(view, img::to_rect(109, 45, 23, 23));
+        controller.btn_st_left  = img::sub_view(view, img::make_rect( 60, 45, 23, 23));
+        controller.btn_st_right = img::sub_view(view, img::make_rect(109, 45, 23, 23));
     }
 }
 
@@ -293,15 +295,15 @@ namespace input_display
     {
         auto& view = keyboard.filter;
         
-        keyboard.key_1 = img::sub_view(view, img::to_rect(21,  3, 14, 14));
-        keyboard.key_2 = img::sub_view(view, img::to_rect(39,  3, 14, 14));
-        keyboard.key_3 = img::sub_view(view, img::to_rect(57,  3, 14, 14));
-        keyboard.key_4 = img::sub_view(view, img::to_rect(75,  3, 14, 14));
-        keyboard.key_w = img::sub_view(view, img::to_rect(48, 21, 14, 14));
-        keyboard.key_a = img::sub_view(view, img::to_rect(35, 39, 14, 14));
-        keyboard.key_s = img::sub_view(view, img::to_rect(53, 39, 14, 14));
-        keyboard.key_d = img::sub_view(view, img::to_rect(71, 39, 14, 14));
-        keyboard.key_space = img::sub_view(view, img::to_rect(84, 75, 104, 14));
+        keyboard.key_1 = img::sub_view(view, img::make_rect(21,  3, 14, 14));
+        keyboard.key_2 = img::sub_view(view, img::make_rect(39,  3, 14, 14));
+        keyboard.key_3 = img::sub_view(view, img::make_rect(57,  3, 14, 14));
+        keyboard.key_4 = img::sub_view(view, img::make_rect(75,  3, 14, 14));
+        keyboard.key_w = img::sub_view(view, img::make_rect(48, 21, 14, 14));
+        keyboard.key_a = img::sub_view(view, img::make_rect(35, 39, 14, 14));
+        keyboard.key_s = img::sub_view(view, img::make_rect(53, 39, 14, 14));
+        keyboard.key_d = img::sub_view(view, img::make_rect(71, 39, 14, 14));
+        keyboard.key_space = img::sub_view(view, img::make_rect(84, 75, 104, 14));
     }
 }
 
@@ -335,9 +337,9 @@ namespace input_display
     {
         auto& view = mouse.filter;
 
-        mouse.btn_left   = img::sub_view(view, img::to_rect( 2, 2, 28, 29));
-        mouse.btn_middle = img::sub_view(view, img::to_rect(34, 2, 12, 29));
-        mouse.btn_right  = img::sub_view(view, img::to_rect(50, 2, 28, 29));
+        mouse.btn_left   = img::sub_view(view, img::make_rect( 2, 2, 28, 29));
+        mouse.btn_middle = img::sub_view(view, img::make_rect(34, 2, 12, 29));
+        mouse.btn_right  = img::sub_view(view, img::make_rect(50, 2, 28, 29));
     }
 }
 
@@ -498,15 +500,15 @@ namespace input_display
 
         state.display = img::make_view(display_width, display_height, buffer32);
 
-        auto controller = img::to_rect(0, 0, ctlr_w, ctlr_h);
+        auto controller = img::make_rect(0, 0, ctlr_w, ctlr_h);
         state_data.controller_view = img::sub_view(state.display, controller);
         init_controller_filter(state_data.controller_filter, raw_controller, buffer8);
 
-        auto keyboard = img::to_rect(controller.x_end, 0, kbd_w, kbd_h);
+        auto keyboard = img::make_rect(controller.x_end, 0, kbd_w, kbd_h);
         state_data.keyboard_view = img::sub_view(state.display, keyboard);
         init_keyboard_filter(state_data.keyboard_filter, raw_keyboard, buffer8);
 
-        auto mouse = img::to_rect(keyboard.x_end, 0, mse_w, mse_h);
+        auto mouse = img::make_rect(keyboard.x_end, 0, mse_w, mse_h);
         state_data.mouse_view = img::sub_view(state.display, mouse);
         init_mouse_filter(state_data.mouse_filter, raw_mouse, buffer8);        
 
@@ -515,7 +517,7 @@ namespace input_display
         auto const coord_x = mse_w / 8;
         auto const coord_y = mse_h / 2;
         auto const coord_width = mse_w * 3 / 4;
-        auto const coords = img::to_rect(coord_x, coord_y, coord_width, TEXT_HEIGHT);
+        auto const coords = img::make_rect(coord_x, coord_y, coord_width, TEXT_HEIGHT);
 
         state_data.mouse_coords_view = img::sub_view(state_data.mouse_view, coords);                
 

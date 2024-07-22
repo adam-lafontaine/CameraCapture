@@ -2,6 +2,11 @@
 
 #include "../span/span.hpp"
 
+#include <functional>
+
+template <class F>
+using fn = std::function<F>;
+
 
 /*  image basic */
 
@@ -205,4 +210,38 @@ namespace image
 
         return pt;
     }
+}
+
+
+/* fill */
+
+namespace image
+{
+    void fill(ImageView const& view, Pixel color);
+
+    void fill(SubView const& view, Pixel color);
+
+    void fill_if(GraySubView const& view, u8 gray, fn<bool(u8)> const& pred);
+}
+
+
+/* transform */
+
+namespace image
+{
+    void transform(ImageView const& src, GrayView const& dst, fn<u8(Pixel)> const& func);
+
+    void transform(GrayView const& src, SubView const& dst, fn<Pixel(u8, Pixel)> const& func);
+
+    void transform(GraySubView const& src, SubView const& dst, fn<Pixel(u8, Pixel)> const& func);
+}
+
+
+/* read write */
+
+namespace image
+{
+    bool read_image_from_file(const char* img_path_src, Image& image_dst);
+
+    bool write_image(Image const& image_src, const char* file_path_dst);
 }

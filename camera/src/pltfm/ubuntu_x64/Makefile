@@ -4,7 +4,7 @@ GPP := g++-11 -std=c++20 -mavx
 #GPP += -DNDEBUG
 
 GPP += -DIMAGE_READ
-GPP += -DIMAGE_WRITE
+#GPP += -DIMAGE_WRITE
 GPP += -DALLOC_COUNT
 
 NO_FLAGS := 
@@ -187,7 +187,13 @@ obj    := $(main_o)
 
 main_dep := $(imgui_include_h)
 main_dep += $(input_display_h)
+main_dep += $(sdl_include_h)
 main_dep += $(stopwatch_h)
+main_dep += $(alloc_type_c)
+main_dep += $(image_c)
+main_dep += $(qsprintf)
+main_dep += $(span_c)
+main_dep += $(stb_image_options_h)
 main_dep += $(sdl_input_c)
 
 #****************

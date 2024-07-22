@@ -417,4 +417,9 @@ int main()
 }
 
 
+#include "../../../../libs/alloc_type/alloc_type.cpp"
+#include "../../../../libs/image/image.cpp"
+#include "../../../../libs/qsprintf/qsprintf.cpp"
 #include "../../../../libs/sdl/sdl_input.cpp"
+#include "../../../../libs/span/span.cpp"
+#include "../../../../libs/stb_image/stb_image_options.hpp"
