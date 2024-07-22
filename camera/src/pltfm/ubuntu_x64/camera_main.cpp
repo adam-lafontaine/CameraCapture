@@ -1,7 +1,8 @@
 #include "../../imgui_sdl_ogl/imgui_include.hpp"
+#include "../../input_display/input_display.hpp"
 #include "../../../../libs/sdl/sdl_include.hpp"
 #include "../../../../libs/util/stopwatch.hpp"
-#include "../../input_display/input_display.hpp"
+
 
 #include <thread>
 
@@ -50,6 +51,32 @@ static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, inpu
 }
 
 
+static void ui_input_window(GLuint texture, u32 width, u32 height, f32 scale)
+{
+    auto w = width * scale;
+    auto h = height * scale;
+
+    ImGui::Begin("Input");
+
+    ImGui::Image((void*)(intptr_t)texture, ImVec2(w, h));
+
+    ImGui::End();
+}
+
+
+static void ui_camera_window(GLuint texture, u32 width, u32 height, f32 scale)
+{
+    auto w = width * scale;
+    auto h = height * scale;
+
+    ImGui::Begin("Camera");
+
+    ImGui::Image((void*)(intptr_t)texture, ImVec2(w, h));
+
+    ImGui::End();
+}
+
+
 enum class RunState : int
 {
     Begin,
@@ -70,9 +97,10 @@ namespace
     idsp::IOState io_state{};
 
     img::Buffer32 camera_buffer;
+    img::ImageView camera_view;
 
     constexpr u32 N_OGL_TEXTURES = 2;
-    constexpr ogl::TextureId input_display_texture_id = { 0 };
+    constexpr ogl::TextureId input_texture_id = { 0 };
     constexpr ogl::TextureId camera_texture_id = { 1 };
     ogl::TextureList<N_OGL_TEXTURES> textures;
 
@@ -244,6 +272,9 @@ static void render_imgui_frame()
     ui::input_frames_window(state);
     ui::diagnostics_window();*/
 
+    ui_input_window(textures.data[input_texture_id.value], io_state.display.width, io_state.display.height, 2.0f);
+    ui_camera_window(textures.data[camera_texture_id.value], camera_view.width, camera_view.height, 1.0f);
+
     ImGui::Render();
     
     glClear(GL_COLOR_BUFFER_BIT);
@@ -264,11 +295,11 @@ static void render_imgui_frame()
 
 static void render_input_display(img::ImageView const& src)
 {
-    ogl::render_to_texture(src.matrix_data_, (int)src.width, (int)src.height, input_display_texture_id);
+    ogl::render_to_texture(src.matrix_data_, (int)src.width, (int)src.height, input_texture_id);
 }
 
 
-static void render_camera_screen(img::ImageView const& src)
+static void render_camera(img::ImageView const& src)
 {
     ogl::render_to_texture(src.matrix_data_, (int)src.width, (int)src.height, camera_texture_id);
 }
@@ -337,7 +368,11 @@ static bool main_init()
     }
 
     // TODO init camera app
-    //img::create_buffer(camera_buffer)
+    u32 w = 1280;
+    u32 h = 720;
+    camera_buffer = img::create_buffer32(w * h, "camera temp");
+    camera_view = img::make_view(w, h, camera_buffer);
+    img::fill(camera_view, img::to_pixel(255, 255, 0));
 
     return true;
 }
@@ -356,7 +391,7 @@ static void main_close()
     sdl::close_game_controllers(sdl_controller, user_input[0]);
     sdl::close();
 
-    //img::destroy_image(game_screen); 
+    mb::destroy_buffer(camera_buffer);
 }
 
 
@@ -387,9 +422,10 @@ static void main_loop()
         //gs::update(input);
         //ui_state.app_frame_ns = camera_sw.get_time_nano();
 
-        render_imgui_frame();
-        //ogl::render_game_screen(game_view, textures);
         render_input_display(io_state.display);
+        render_camera(camera_view);
+
+        render_imgui_frame();        
 
         // cap frame rate
         wait_for_framerate();
