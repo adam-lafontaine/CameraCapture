@@ -1,4 +1,8 @@
+#pragma once
+
 #include "camera_usb.hpp"
+
+#define LIBUVC_IMPLEMENTATION
 #include "libuvc2.hpp"
 
 
@@ -28,7 +32,7 @@ namespace camera_usb
         int fps = -1;
 
         uvc::uvc_frame_format format;
-        u32 format_code;
+        u64 format_code;
 
         bool is_connected = false;
         bool is_streaming = false;
@@ -101,6 +105,10 @@ namespace camera_usb
             fps = 10'000'000 / frame_desc->dwDefaultFrameInterval;
         }
 
+        device.frame_width = width;
+        device.frame_height = height;
+        device.fps = fps;
+
         uvc::frame_format frame_format;        
 
         switch (format_desc->bDescriptorSubtype) 
@@ -118,11 +126,18 @@ namespace camera_usb
 
         device.format = frame_format;
 
-        device.format_code = *(u32*)format_desc->fourccFormat;
+        device.format_code = 0;
 
-        device.frame_width = width;
-        device.frame_height = height;
-        device.fps = fps;
+        SpanView<u8> src;
+        src.begin = (u8*)format_desc->fourccFormat;
+        src.length = 4;
+
+        SpanView<u8> dst;
+        dst.begin = (u8*)(&device.format_code);
+        dst.length = 4;
+
+        span::copy_span(src, dst);
+        
 
         /*auto res = uvc::uvc_get_stream_ctrl_format_size(
             device.h_device, &device.ctrl, // result stored in ctrl
@@ -195,12 +210,50 @@ namespace camera_usb
 
         return list.count > 0;
     }
+
+
+    static cstr decode_format_code(DeviceUVC const& device)
+    {
+        return (cstr)(&device.format_code);
+    }
 }
 
 
-/* connect disconnect */
+/* static devices */
 
 namespace camera_usb
 {
-    
+    DeviceListUVC uvc_list;
+}
+
+
+/* api */
+
+namespace camera_usb
+{
+    CameraList enumerate_cameras()
+    {
+        CameraList list;
+
+        if (!enumerate_devices(uvc_list))
+        {
+            list.count = 0;
+            return list;
+        }
+
+        list.count = uvc_list.count;
+        for (u32 i = 0; i < list.count; i++)
+        {
+            auto& camera = list.cameras[i];
+            auto& device = uvc_list.devices[i];
+
+            camera.id = device.device_id;
+            camera.frame_width = device.frame_width;
+            camera.frame_height = device.frame_height;
+            camera.fps = device.fps;
+            camera.format = decode_format_code(device);
+        }
+
+        return list;
+    }
 }

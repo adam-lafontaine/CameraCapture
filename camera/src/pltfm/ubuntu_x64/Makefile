@@ -39,6 +39,7 @@ image      := $(libs)/image
 qsprintf   := $(libs)/qsprintf
 span       := $(libs)/span
 stb_image  := $(libs)/stb_image
+usb        := $(libs)/usb
 util       := $(libs)/util
 
 sdl        := $(libs)/sdl
@@ -165,6 +166,18 @@ sdl_input_c += $(numeric_h)
 #**********
 
 
+#*** usb ***
+
+camera_usb_h := $(usb)/camera_usb.hpp
+libuvc_h     := $(usb)/libuvc2.hpp
+
+camera_usb_c := $(usb)/camera_usb.cpp
+camera_usb_c += $(camera_usb_h)
+camera_usb_c += $(libuvc_h)
+
+#**********
+
+
 #*** input_display ***
 
 input_display := $(src)/input_display
@@ -208,6 +221,7 @@ main_dep += $(qsprintf)
 main_dep += $(span_c)
 main_dep += $(stb_image_options_h)
 main_dep += $(sdl_input_c)
+main_dep += $(camera_usb_c)
 main_dep += $(diagnostics_h)
 main_dep += $(diagnostics_c)
 
