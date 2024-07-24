@@ -8,10 +8,11 @@ GPP += -DIMAGE_READ
 GPP += -DALLOC_COUNT
 
 NO_FLAGS := 
-SDL2 := `sdl2-config --cflags --libs`
+SDL2   := `sdl2-config --cflags --libs`
 OPENGL := -lGL -ldl
+USB    := -pthread `pkg-config --libs --cflags libusb-1.0` -ljpeg
 
-ALL_LFLAGS := $(SDL2) $(OPENGL)
+ALL_LFLAGS := $(SDL2) $(OPENGL) $(USB)
 
 root       := ../../../..
 
@@ -20,9 +21,6 @@ build  := $(camera)/build/ubuntu
 src    := $(camera)/src
 
 pltfm := $(src)/pltfm/ubuntu_x64
-
-
-
 
 libs := $(root)/libs
 
@@ -253,7 +251,7 @@ imgui_dep := $(imgui_options_h)
 
 $(main_o): $(main_c) $(main_dep)
 	@echo "\n  main"
-	$(GPP) -o $@ -c $< $(SDL2) $(OPENGL)
+	$(GPP) -o $@ -c $< $(ALL_LFLAGS)
 
 
 $(imgui_o): $(imgui_c) $(imgui_dep)

@@ -424,6 +424,8 @@ static void main_loop()
 
     //auto game_view = img::make_view(camera_image);
 
+    cdsp::init(camera_state);
+
     main_sw.start();
     
     while(is_running())
@@ -480,6 +482,7 @@ int main()
 #include "../../../../libs/sdl/sdl_input.cpp"
 #include "../../../../libs/span/span.cpp"
 #include "../../../../libs/stb_image/stb_image_options.hpp"
+#include "../../../../libs/usb/camera_uvc.cpp"
 #include "../../camera_display/camera_display.cpp"
 #include "../../input_display/input_display.cpp"
 #include "../../diagnostics/diagnostics.cpp"

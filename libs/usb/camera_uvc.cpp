@@ -27,9 +27,9 @@ namespace camera_usb
         int product_id = -1;
         int vendor_id = -1;
         
-        int frame_width = -1;
-        int frame_height = -1;
-        int fps = -1;
+        u32 frame_width = 0;
+        u32 frame_height = 0;
+        u32 fps = 0;
 
         uvc::uvc_frame_format format;
         u64 format_code;
@@ -70,7 +70,7 @@ namespace camera_usb
 
         auto res = uvc::uvc_open(device.p_device, &device.h_device);
         
-        return res != uvc::UVC_SUCCESS;
+        return res == uvc::UVC_SUCCESS;
     }
     
     
@@ -88,12 +88,13 @@ namespace camera_usb
     {
         if (!open_device(device))
         {
+            assert(false && "Could not open device");
             return false;
         }
 
-        int width = 640;
-        int height = 480;
-        int fps = 30;
+        u32 width = 640;
+        u32 height = 480;
+        u32 fps = 30;
 
         const uvc::format_desc* format_desc = uvc::uvc_get_format_descs(device.h_device);
         const uvc::frame_desc* frame_desc = format_desc->frame_descs;
