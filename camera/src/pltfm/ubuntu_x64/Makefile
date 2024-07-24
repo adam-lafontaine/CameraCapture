@@ -186,6 +186,8 @@ input_display_h := $(input_display)/input_display.hpp
 input_display_h += $(input_h)
 input_display_h += $(image_h)
 
+input_display_c := $(input_display)/input_display.cpp
+
 #***************
 
 
@@ -216,7 +218,6 @@ main_o := $(build)/main.o
 obj    := $(main_o)
 
 main_dep := $(imgui_include_h)
-main_dep += $(input_display_h)
 main_dep += $(sdl_include_h)
 main_dep += $(stopwatch_h)
 main_dep += $(alloc_type_c)
@@ -230,6 +231,8 @@ main_dep += $(camera_display_h)
 main_dep += $(camera_display_c)
 main_dep += $(diagnostics_h)
 main_dep += $(diagnostics_c)
+main_dep += $(input_display_h)
+main_dep += $(input_display_c)
 
 #****************
 
@@ -245,19 +248,6 @@ imgui_dep := $(imgui_options_h)
 #****************
 
 
-#*** input_display cpp ***
-
-input_display_c := $(input_display)/input_display.cpp
-input_display_o := $(build)/input_display.o
-obj += $(input_display_o)
-
-input_display_dep := $(input_display_h)
-input_display_dep += $(qsprintf_h)
-input_display_dep += $(span_h)
-
-#***************
-
-
 #*** app ***
 
 
@@ -269,11 +259,6 @@ $(main_o): $(main_c) $(main_dep)
 $(imgui_o): $(imgui_c) $(imgui_dep)
 	@echo "\n  imgui"
 	$(GPP) -o $@ -c $< $(SDL2) $(OPENGL)
-
-
-$(input_display_o): $(input_display_c) $(input_display_dep)
-	@echo "\n  input_display"
-	$(GPP) -o $@ -c $< $(NO_FLAGS)
 
 #**************
 

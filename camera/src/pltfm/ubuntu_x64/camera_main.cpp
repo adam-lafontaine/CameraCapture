@@ -481,4 +481,5 @@ int main()
 #include "../../../../libs/span/span.cpp"
 #include "../../../../libs/stb_image/stb_image_options.hpp"
 #include "../../camera_display/camera_display.cpp"
+#include "../../input_display/input_display.cpp"
 #include "../../diagnostics/diagnostics.cpp"
