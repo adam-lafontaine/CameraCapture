@@ -400,9 +400,9 @@ static bool main_init()
 
 
 static void main_close()
-{  
-    //gs::close();
+{ 
     idsp::close(io_state);
+    cdsp::close(camera_state);
     
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
@@ -424,7 +424,7 @@ static void main_loop()
 
     //auto game_view = img::make_view(camera_image);
 
-    cdsp::init(camera_state);
+    cdsp::init_async(camera_state);
 
     main_sw.start();
     

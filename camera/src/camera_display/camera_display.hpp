@@ -8,15 +8,27 @@ namespace cam = camera_usb;
 
 namespace camera_display
 {
+    enum class ConnectionStatus : u8
+    {
+        Disconnected,
+        Connecting,
+        Connected
+    };
+
+
     class CameraState
     {
     public:
         cam::CameraList cameras;
 
+        ConnectionStatus connection = ConnectionStatus::Disconnected;
+
     };
 
 
-    bool init(CameraState& state);
+    void init_async(CameraState& state);
+
+    void close(CameraState& state);
 
     void show_cameras(CameraState& state);
 }

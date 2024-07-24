@@ -5,6 +5,22 @@
 #define LIBUVC_IMPLEMENTATION
 #include "libuvc2.hpp"
 
+/*
+
+libuvc requires RW permissions for opening capturing devices, so you must
+create the following .rules file:
+
+/etc/udev/rules.d/99-uvc.rules
+
+Then, for each webcam add the following line:
+
+SUBSYSTEMS=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="YYYY", MODE="0666"
+
+Replace XXXX and YYYY for the 4 hexadecimal characters corresponding to the
+vendor and product ID of your webcams.
+
+*/
+
 
 namespace camera_usb
 {
@@ -213,6 +229,20 @@ namespace camera_usb
     }
 
 
+    static void close_devices(DeviceListUVC& list)
+    {
+        if (list.device_list)
+        {
+            uvc::uvc_free_device_list(list.device_list, 0);
+        }
+
+        if (list.context)
+        {
+            uvc::uvc_exit(list.context);
+        }
+    }
+
+
     static cstr decode_format_code(DeviceUVC const& device)
     {
         return (cstr)(&device.format_code);
@@ -256,5 +286,11 @@ namespace camera_usb
         }
 
         return cameras;
+    }
+
+
+    void close()
+    {
+        close_devices(uvc_list);
     }
 }
