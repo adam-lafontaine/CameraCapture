@@ -21,7 +21,7 @@ namespace camera_usb
     class CameraList
     {
     public:
-        Camera cameras[16];
+        Camera list[16];
 
         u32 count = 0;
     };

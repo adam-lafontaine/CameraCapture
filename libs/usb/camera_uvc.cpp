@@ -233,18 +233,18 @@ namespace camera_usb
 {
     CameraList enumerate_cameras()
     {
-        CameraList list;
+        CameraList cameras;
 
         if (!enumerate_devices(uvc_list))
         {
-            list.count = 0;
-            return list;
+            cameras.count = 0;
+            return cameras;
         }
 
-        list.count = uvc_list.count;
-        for (u32 i = 0; i < list.count; i++)
+        cameras.count = uvc_list.count;
+        for (u32 i = 0; i < cameras.count; i++)
         {
-            auto& camera = list.cameras[i];
+            auto& camera = cameras.list[i];
             auto& device = uvc_list.devices[i];
 
             camera.id = device.device_id;
@@ -254,6 +254,6 @@ namespace camera_usb
             camera.format = decode_format_code(device);
         }
 
-        return list;
+        return cameras;
     }
 }

@@ -171,7 +171,7 @@ sdl_input_c += $(numeric_h)
 camera_usb_h := $(usb)/camera_usb.hpp
 libuvc_h     := $(usb)/libuvc2.hpp
 
-camera_usb_c := $(usb)/camera_usb.cpp
+camera_usb_c := $(usb)/camera_uvc.cpp
 camera_usb_c += $(camera_usb_h)
 camera_usb_c += $(libuvc_h)
 
@@ -199,8 +199,12 @@ diagnostics_c := $(diagnostics)/diagnostics.cpp
 #***************
 
 
-#*** camera app ***
+#*** camera display ***
 
+camera_display := $(src)/camera_display
+
+camera_display_h := $(camera_display)/camera_display.hpp
+camera_display_c := $(camera_display)/camera_display.cpp
 
 #******************
 
@@ -222,6 +226,8 @@ main_dep += $(span_c)
 main_dep += $(stb_image_options_h)
 main_dep += $(sdl_input_c)
 main_dep += $(camera_usb_c)
+main_dep += $(camera_display_h)
+main_dep += $(camera_display_c)
 main_dep += $(diagnostics_h)
 main_dep += $(diagnostics_c)
 
