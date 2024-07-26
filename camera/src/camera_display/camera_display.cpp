@@ -28,22 +28,29 @@ namespace camera_display
 
     static void camera_properties_table(cam::CameraList const& cameras)
     {
-        constexpr int col_w       = 0;
-        constexpr int col_h       = 1;
-        constexpr int col_fps     = 2;
-        constexpr int col_format  = 3;        
-        constexpr int col_vendor  = 4;
-        constexpr int col_product = 5;
-        constexpr int col_sn      = 6;
-        constexpr int n_columns   = 7;
+        enum class columns : int
+        {
+            radio = 0,
+            width,
+            height,
+            fps,
+            format,
+            vendor,
+            product,
+            serial,
+            count
+        };
 
         int table_flags = ImGuiTableFlags_BordersInnerV;
         auto table_dims = ImVec2(0.0f, 0.0f);
+
+        static int camera_id = 0;
 
         //ImU32 cell_bg_color = ImGui::GetColorU32(im_gray(0.1f));
 
         auto const setup_columns = []()
         {
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 40.0f);
             ImGui::TableSetupColumn("W", ImGuiTableColumnFlags_WidthFixed, 30.0f);
             ImGui::TableSetupColumn("H", ImGuiTableColumnFlags_WidthFixed, 30.0f);
             ImGui::TableSetupColumn("FPS", ImGuiTableColumnFlags_WidthFixed, 30.0f);
@@ -56,29 +63,32 @@ namespace camera_display
 
         auto const table_row = [](cam::Camera const& camera)
         {
-            ImGui::TableSetColumnIndex(col_w);
+            ImGui::TableSetColumnIndex((int)columns::radio);
+            ImGui::RadioButton(camera.label.begin, &camera_id, camera.id);
+
+            ImGui::TableSetColumnIndex((int)columns::width);
             ImGui::Text("%u", camera.frame_width);
 
-            ImGui::TableSetColumnIndex(col_h);
+            ImGui::TableSetColumnIndex((int)columns::height);
             ImGui::Text("%u", camera.frame_height);
 
-            ImGui::TableSetColumnIndex(col_fps);
+            ImGui::TableSetColumnIndex((int)columns::fps);
             ImGui::Text("%u", camera.fps);
 
-            ImGui::TableSetColumnIndex(col_format);
+            ImGui::TableSetColumnIndex((int)columns::format);
             ImGui::Text("%s", camera.format.begin);
 
-            ImGui::TableSetColumnIndex(col_vendor);
+            ImGui::TableSetColumnIndex((int)columns::vendor);
             ImGui::Text("%s", camera.vendor.begin);
 
-            ImGui::TableSetColumnIndex(col_product);
+            ImGui::TableSetColumnIndex((int)columns::product);
             ImGui::Text("%s", camera.product.begin);
 
-            ImGui::TableSetColumnIndex(col_sn);
+            ImGui::TableSetColumnIndex((int)columns::serial);
             ImGui::Text("%s", camera.serial_number.begin);
         };
 
-        if (!ImGui::BeginTable("CameraPropertiesTable", n_columns, table_flags, table_dims)) 
+        if (!ImGui::BeginTable("CameraPropertiesTable", (int)columns::count, table_flags, table_dims)) 
         { 
             return; 
         }
@@ -124,12 +134,15 @@ namespace camera_display
 
 
     void show_cameras(CameraState& state)
-    {
-        if (!ImGui::CollapsingHeader("Cameras"))
+    {   
+        if (state.connection == ConnectionStatus::Connected)
         {
-            return; 
+            camera_properties_table(state.cameras);
+        }
+        else
+        {
+            ImGui::Text("Connecting...");
         }
         
-        camera_properties_table(state.cameras);
     }
 }

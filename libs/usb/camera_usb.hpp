@@ -19,6 +19,8 @@ namespace camera_usb
         StringView vendor;
         StringView product;
         StringView serial_number;
+
+        StringView label;
     };
 
 

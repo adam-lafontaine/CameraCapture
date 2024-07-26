@@ -54,6 +54,8 @@ namespace camera_usb
         char product_id[5] = { 0 };
         char vendor_id[5] = { 0 };
         char serial_number[32] = { 0 };
+
+        char label[32] = { 0 };
         
         DeviceConfigUVC config;
 
@@ -159,6 +161,8 @@ namespace camera_usb
     
     static bool read_device_properties(DeviceUVC& device)
     {
+        static char label_ch = 'A';
+
         uvc::device_descriptor* desc;
 
         auto res = uvc::uvc_get_device_descriptor(device.p_device, &desc);
@@ -170,9 +174,12 @@ namespace camera_usb
 
         qsnprintf(device.product_id, 5, "%04x", desc->idProduct);
         qsnprintf(device.vendor_id, 5, "%04x", desc->idVendor);
-        qsnprintf(device.serial_number, 32, "%s", desc->serialNumber);
+        qsnprintf(device.serial_number, 32, "%s", desc->serialNumber);        
             
-        uvc::uvc_free_device_descriptor(desc);        
+        uvc::uvc_free_device_descriptor(desc);
+
+        qsnprintf(device.label, 32, "%c", label_ch);
+        ++label_ch;
         
         if (!open_device(device))
         {
@@ -278,6 +285,8 @@ namespace camera_usb
             return cameras;
         }
 
+
+
         cameras.count = uvc_list.count;
         for (u32 i = 0; i < cameras.count; i++)
         {
@@ -295,6 +304,7 @@ namespace camera_usb
             camera.vendor = span::to_string_view(device.vendor_id);
             camera.product = span::to_string_view(device.product_id);
             camera.serial_number = span::to_string_view(device.serial_number);
+            camera.label = span::to_string_view(device.label);
         }
 
         return cameras;
