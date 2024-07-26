@@ -1,5 +1,8 @@
 #pragma once
 
+#include "../../../libs/imgui/imgui.h"
+
+
 /* memory */
 
 namespace diagnostics

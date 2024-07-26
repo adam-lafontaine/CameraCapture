@@ -8,10 +8,11 @@ GPP += -DIMAGE_READ
 GPP += -DALLOC_COUNT
 
 NO_FLAGS := 
-SDL2 := `sdl2-config --cflags --libs`
+SDL2   := `sdl2-config --cflags --libs`
 OPENGL := -lGL -ldl
+USB    := -pthread `pkg-config --libs --cflags libusb-1.0` -ljpeg
 
-ALL_LFLAGS := $(SDL2) $(OPENGL)
+ALL_LFLAGS := $(SDL2) $(OPENGL) $(USB)
 
 root       := ../../../..
 
@@ -20,9 +21,6 @@ build  := $(camera)/build/ubuntu
 src    := $(camera)/src
 
 pltfm := $(src)/pltfm/ubuntu_x64
-
-
-
 
 libs := $(root)/libs
 
@@ -39,6 +37,7 @@ image      := $(libs)/image
 qsprintf   := $(libs)/qsprintf
 span       := $(libs)/span
 stb_image  := $(libs)/stb_image
+usb        := $(libs)/usb
 util       := $(libs)/util
 
 sdl        := $(libs)/sdl
@@ -165,6 +164,18 @@ sdl_input_c += $(numeric_h)
 #**********
 
 
+#*** usb ***
+
+camera_usb_h := $(usb)/camera_usb.hpp
+libuvc_h     := $(usb)/libuvc2.hpp
+
+camera_usb_c := $(usb)/camera_uvc.cpp
+camera_usb_c += $(camera_usb_h)
+camera_usb_c += $(libuvc_h)
+
+#**********
+
+
 #*** input_display ***
 
 input_display := $(src)/input_display
@@ -172,6 +183,8 @@ input_display := $(src)/input_display
 input_display_h := $(input_display)/input_display.hpp
 input_display_h += $(input_h)
 input_display_h += $(image_h)
+
+input_display_c := $(input_display)/input_display.cpp
 
 #***************
 
@@ -186,8 +199,12 @@ diagnostics_c := $(diagnostics)/diagnostics.cpp
 #***************
 
 
-#*** camera app ***
+#*** camera display ***
 
+camera_display := $(src)/camera_display
+
+camera_display_h := $(camera_display)/camera_display.hpp
+camera_display_c := $(camera_display)/camera_display.cpp
 
 #******************
 
@@ -199,7 +216,6 @@ main_o := $(build)/main.o
 obj    := $(main_o)
 
 main_dep := $(imgui_include_h)
-main_dep += $(input_display_h)
 main_dep += $(sdl_include_h)
 main_dep += $(stopwatch_h)
 main_dep += $(alloc_type_c)
@@ -208,8 +224,13 @@ main_dep += $(qsprintf)
 main_dep += $(span_c)
 main_dep += $(stb_image_options_h)
 main_dep += $(sdl_input_c)
+main_dep += $(camera_usb_c)
+main_dep += $(camera_display_h)
+main_dep += $(camera_display_c)
 main_dep += $(diagnostics_h)
 main_dep += $(diagnostics_c)
+main_dep += $(input_display_h)
+main_dep += $(input_display_c)
 
 #****************
 
@@ -225,35 +246,17 @@ imgui_dep := $(imgui_options_h)
 #****************
 
 
-#*** input_display cpp ***
-
-input_display_c := $(input_display)/input_display.cpp
-input_display_o := $(build)/input_display.o
-obj += $(input_display_o)
-
-input_display_dep := $(input_display_h)
-input_display_dep += $(qsprintf_h)
-input_display_dep += $(span_h)
-
-#***************
-
-
 #*** app ***
 
 
 $(main_o): $(main_c) $(main_dep)
 	@echo "\n  main"
-	$(GPP) -o $@ -c $< $(SDL2) $(OPENGL)
+	$(GPP) -o $@ -c $< $(ALL_LFLAGS)
 
 
 $(imgui_o): $(imgui_c) $(imgui_dep)
 	@echo "\n  imgui"
 	$(GPP) -o $@ -c $< $(SDL2) $(OPENGL)
-
-
-$(input_display_o): $(input_display_c) $(input_display_dep)
-	@echo "\n  input_display"
-	$(GPP) -o $@ -c $< $(NO_FLAGS)
 
 #**************
 

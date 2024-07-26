@@ -1,5 +1,6 @@
 #include "../../imgui_sdl_ogl/imgui_include.hpp"
 #include "../../input_display/input_display.hpp"
+#include "../../camera_display/camera_display.hpp"
 #include "../../diagnostics/diagnostics.hpp"
 #include "../../../../libs/sdl/sdl_include.hpp"
 #include "../../../../libs/util/stopwatch.hpp"
@@ -10,6 +11,7 @@
 
 namespace img = image;
 namespace idsp = input_display;
+namespace cdsp = camera_display;
 
 
 constexpr f64 NANO = 1'000'000'000;
@@ -78,6 +80,16 @@ static void ui_camera_window(GLuint texture, u32 width, u32 height, f32 scale)
 }
 
 
+static void ui_camera_controls_window(cdsp::CameraState& state)
+{
+    ImGui::Begin("Controls");
+
+    camera_display::show_cameras(state);
+
+    ImGui::End();
+}
+
+
 static void ui_diagnostics_window()
 {
     ImGui::Begin("Diagnostics");
@@ -106,6 +118,8 @@ namespace
     u8 input_id_prev = 1;
 
     idsp::IOState io_state{};
+    cdsp::CameraState camera_state{};
+
 
     img::Buffer32 camera_buffer;
     img::ImageView camera_view;
@@ -276,15 +290,9 @@ static void render_imgui_frame()
     ui::show_imgui_demo(ui_state);
 #endif
 
-    /*ui::game_control_window(state);
-        
-    ui::game_window("GAME", (void*)(intptr_t)textures.game_texture, game_screen.width, game_screen.height, state);
-    ui::input_display_window((void*)(intptr_t)textures.input_texture, io_state.display.width, io_state.display.height, state);
-    ui::input_frames_window(state);
-    ui::diagnostics_window();*/
-
     ui_input_window(textures.data[input_texture_id.value], io_state.display.width, io_state.display.height, 2.0f);
     ui_camera_window(textures.data[camera_texture_id.value], camera_view.width, camera_view.height, 1.0f);
+    ui_camera_controls_window(camera_state);
 
     ui_diagnostics_window();
 
@@ -385,16 +393,16 @@ static bool main_init()
     u32 h = 720;
     camera_buffer = img::create_buffer32(w * h, "camera temp");
     camera_view = img::make_view(w, h, camera_buffer);
-    img::fill(camera_view, img::to_pixel(255, 255, 0));
+    img::fill(camera_view, img::to_pixel(128));
 
     return true;
 }
 
 
 static void main_close()
-{  
-    //gs::close();
+{ 
     idsp::close(io_state);
+    cdsp::close(camera_state);
     
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
@@ -415,6 +423,8 @@ static void main_loop()
 #endif
 
     //auto game_view = img::make_view(camera_image);
+
+    cdsp::init_async(camera_state);
 
     main_sw.start();
     
@@ -472,4 +482,7 @@ int main()
 #include "../../../../libs/sdl/sdl_input.cpp"
 #include "../../../../libs/span/span.cpp"
 #include "../../../../libs/stb_image/stb_image_options.hpp"
+#include "../../../../libs/usb/camera_uvc.cpp"
+#include "../../camera_display/camera_display.cpp"
+#include "../../input_display/input_display.cpp"
 #include "../../diagnostics/diagnostics.cpp"
