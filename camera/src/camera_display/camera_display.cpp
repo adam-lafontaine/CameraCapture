@@ -11,9 +11,6 @@ namespace cam = camera_usb;
 
 namespace camera_display
 {
-    using CS = ConnectionStatus;
-
-
     std::thread connect_th;
 }
 
@@ -38,6 +35,7 @@ namespace camera_display
             vendor,
             product,
             serial,
+            connect,
             count
         };
 
@@ -58,6 +56,7 @@ namespace camera_display
             ImGui::TableSetupColumn("Vendor", ImGuiTableColumnFlags_WidthFixed, 50.0f);
             ImGui::TableSetupColumn("Product", ImGuiTableColumnFlags_WidthFixed, 50.0f);
             ImGui::TableSetupColumn("SN", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+            ImGui::TableSetupColumn("Connect", ImGuiTableColumnFlags_WidthFixed, 80.0f);
             ImGui::TableHeadersRow();
         };
 
@@ -86,6 +85,9 @@ namespace camera_display
 
             ImGui::TableSetColumnIndex((int)columns::serial);
             ImGui::Text("%s", camera.serial_number.begin);
+
+            //ImGui::TableSetColumnIndex((int)columns::connect);
+            //ImGui::Checkbox();
         };
 
         if (!ImGui::BeginTable("CameraPropertiesTable", (int)columns::count, table_flags, table_dims)) 
@@ -112,13 +114,9 @@ namespace camera_display
 {
     void init_async(CameraState& state)
     {
-        state.connection = ConnectionStatus::Disconnected;
-
         connect_th = std::thread([&]()
         {
-            state.connection = CS::Connecting;
             state.cameras = camera_usb::enumerate_cameras();
-            state.connection = state.cameras.count > 0 ? CS::Connected : CS::Disconnected;
         });
     }
 
@@ -127,15 +125,13 @@ namespace camera_display
     {
         connect_th.join();
 
-        camera_usb::close();
-
-        state.connection = ConnectionStatus::Disconnected;
+        camera_usb::close(state.cameras);
     }
 
 
     void show_cameras(CameraState& state)
     {   
-        if (state.connection == ConnectionStatus::Connected)
+        if (state.is_connected())
         {
             camera_properties_table(state.cameras);
         }

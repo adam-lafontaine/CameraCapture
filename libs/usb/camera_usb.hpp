@@ -5,6 +5,21 @@
 
 namespace camera_usb
 {
+    enum class ConnectionStatus : u8
+    {
+        Disconnected,
+        Connecting,
+        Connected
+    };
+
+
+    enum class CameraStatus : u8
+    {
+        Inactive,
+        Active,
+    };
+
+
     class Camera
     {
     public:
@@ -21,6 +36,8 @@ namespace camera_usb
         StringView serial_number;
 
         StringView label;
+
+        CameraStatus status = CameraStatus::Inactive;
     };
 
 
@@ -30,10 +47,12 @@ namespace camera_usb
         Camera list[16];
 
         u32 count = 0;
+
+        ConnectionStatus status = ConnectionStatus::Disconnected;
     };
 
 
     CameraList enumerate_cameras();
 
-    void close();
+    void close(CameraList& cameras);
 }
