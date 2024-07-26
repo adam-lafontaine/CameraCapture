@@ -3,23 +3,30 @@
 #include "../image/image.hpp"
 
 
+/* status enum */
+
 namespace camera_usb
 {
     enum class ConnectionStatus : u8
     {
-        Disconnected,
+        Disconnected = 0,
         Connecting,
         Connected
     };
-
-
+    
+    
     enum class CameraStatus : u8
     {
-        Inactive,
+        Inactive = 0,
         Active,
+        Open,
+        Streaming
     };
+}
 
 
+namespace camera_usb
+{
     class Camera
     {
     public:
@@ -55,4 +62,11 @@ namespace camera_usb
     CameraList enumerate_cameras();
 
     void close(CameraList& cameras);
+
+
+    void close_camera(Camera& camera);
+
+    bool open_camera(Camera& camera);
+
+    void stream_camera(Camera& camera);
 }

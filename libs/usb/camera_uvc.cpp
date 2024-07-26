@@ -31,10 +31,12 @@ namespace camera_usb
 
     enum class DeviceStatus : u8
     {
-        Inactive,
+        Inactive = 0,
         Active,
-        Open,
-        Streaming
+        DeviceOpen,
+        StreamOpen,
+        StreamReady,
+        StreamRunning
     };
 
 
@@ -138,12 +140,70 @@ namespace camera_usb
     }
 
 
+    static void close_stream(DeviceUVC& device)
+    {
+        if (device.h_stream)
+        {
+            uvc::uvc_stream_close(device.h_stream);
+            device.h_stream = nullptr;
+        }
+    }
+
+
     static void stop_stream(DeviceUVC& device)
     {
         if (device.h_stream)
         {
             uvc::uvc_stop_streaming(device.h_device);
-            device.h_stream = nullptr;
+        }
+    }
+
+
+    static bool open_stream(DeviceUVC& device)
+    {
+        if (!device.h_device)
+        {
+            assert(false && "Device not open");
+            return false;
+        }
+
+        auto res = uvc::uvc_stream_open_ctrl(device.h_device, &device.h_stream, &device.ctrl);
+        
+        return res == uvc::UVC_SUCCESS;
+    }
+
+
+    static bool start_stream_single_frame(DeviceUVC& device)
+    {
+        if (!device.h_stream)
+        {
+            assert(false && "Stream not open");
+        }
+
+        auto res = uvc::uvc_stream_start(device.h_stream, 0, (void*)12345, 0);
+
+        return res == uvc::UVC_SUCCESS;
+    }
+
+
+    static void enable_exposure_mode(DeviceUVC const& device)
+    {
+        constexpr u8 EXPOSURE_MODE_AUTO = 2;
+        constexpr u8 EXPOSURE_MODE_APERTURE = 8;
+
+        auto res = uvc::uvc_set_ae_mode(device.h_device, EXPOSURE_MODE_AUTO);
+        if (res == uvc::UVC_SUCCESS)
+        {
+            return;
+        }
+
+        if (res == uvc::UVC_ERROR_PIPE)
+        {
+            res = uvc::uvc_set_ae_mode(device.h_device, EXPOSURE_MODE_APERTURE);
+            if (res != uvc::UVC_SUCCESS)
+            {
+                // meh
+            }
         }
     }
 }
@@ -297,6 +357,7 @@ namespace camera_usb
         for (int i = 0; i < list.count; ++i)
         {
             auto& device = list.devices[i];
+            stop_stream(device);
             close_device(device);
             uvc::uvc_unref_device(device.p_device);
             device.p_device = nullptr;
@@ -321,28 +382,73 @@ namespace camera_usb
 
 namespace camera_usb
 {
-    static void stop_device(DeviceUVC& device)
+    static bool open_device_stream(DeviceUVC& device)
     {
-        
+        if (device.status < DeviceStatus::DeviceOpen)
+        {
+            if (!open_device(device))
+            {
+                assert(false && "Could not open device");
+                return false;
+            }
+
+            if (!load_device_config(device))
+            {
+                assert(false && "Could not get configuration");
+                close_device(device);
+                return false;
+            }
+
+            device.status = DeviceStatus::DeviceOpen;
+        }
+
+        if (!open_stream(device))
+        {
+            assert(false && "Could not open stream");
+            return false;
+        }        
+
+        device.status = DeviceStatus::StreamOpen;
+
+        return true;
     }
 
 
-    static bool start_device(DeviceUVC& device)
+    static void close_device_stream(DeviceUVC& device)
     {
-        if (!open_device(device))
+        close_stream(device);
+
+        if (device.status > DeviceStatus::DeviceOpen)
         {
-            assert(false && "Could not open device");
+            device.status = DeviceStatus::DeviceOpen;
+        }
+    }
+
+
+    static bool start_device_stream(DeviceUVC& device)
+    {
+        if (!start_stream_single_frame(device))
+        {
+            assert(false && "Could not start stream");
             return false;
         }
 
-        if (!load_device_config(device))
+        enable_exposure_mode(device);
+
+        device.status = DeviceStatus::StreamReady;
+
+        return true;
+    }
+
+
+    static void stop_device_stream(DeviceUVC& device)
+    {
+        stop_stream(device);
+
+        if (device.status > DeviceStatus::StreamOpen)
         {
-            assert(false && "Could not get configuration");
-            stop_device(device);
-            return false;
+            device.status = DeviceStatus::StreamOpen;
         }
-
-
     }
 }
 
@@ -352,6 +458,24 @@ namespace camera_usb
 namespace camera_usb
 {
     DeviceListUVC uvc_list;
+
+
+    static DeviceUVC find_device(Camera const& camera)
+    {
+        for (u32 i = 0; i < uvc_list.count; i++)
+        {
+            auto& device = uvc_list.devices[i];
+            if (device.device_id == camera.id)
+            {
+                return device;
+            }
+        }
+
+        DeviceUVC empty{};
+        empty.device_id = -1;
+
+        return empty;
+    }
 }
 
 
@@ -408,6 +532,41 @@ namespace camera_usb
             camera.id = -1;
             camera.status = CameraStatus::Inactive;
         }
+    }
+
+
+    void close_camera(Camera& camera)
+    {
+        auto& device = uvc_list.devices[camera.id];
+        stop_device_stream(device);
+        close_device_stream(device);
+
+        camera.status = CameraStatus::Active;
+    }
+    
+    
+    bool open_camera(Camera& camera)
+    {
+        auto& device = uvc_list.devices[camera.id];
+        if (!open_device_stream(device))
+        {            
+            return false;
+        }
+
+        if (!start_device_stream(device))
+        {
+            return false;
+        }
+
+        camera.status = CameraStatus::Open;
+
+        return true;
+    }
+
+
+    void stream_camera(Camera& camera)
+    {
+        auto& device = uvc_list.devices[camera.id];
     }
 }
 
