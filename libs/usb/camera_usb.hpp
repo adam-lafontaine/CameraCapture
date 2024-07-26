@@ -14,7 +14,11 @@ namespace camera_usb
 		u32 frame_height = 0;
 		u32 fps = 0;
 
-        cstr format;
+        StringView format;
+
+        StringView vendor;
+        StringView product;
+        StringView serial_number;
     };
 
 
@@ -28,4 +32,6 @@ namespace camera_usb
 
 
     CameraList enumerate_cameras();
+
+    void close();
 }

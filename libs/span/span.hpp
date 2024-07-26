@@ -3,11 +3,13 @@
 #include "../util/memory_buffer.hpp"
 #include "../util/stack_buffer.hpp"
 #include "../qsprintf/qsprintf.hpp"
+#include "../util/numeric.hpp"
 
 #include <cstring>
 
 namespace mb = memory_buffer;
 namespace sb = stack_buffer;
+namespace num = numeric;
 
 
 template <typename T>
@@ -159,6 +161,19 @@ namespace span
     }
 
 
+    template <typename T>
+    inline StringView to_string_view(T* begin, u32 length)
+    {
+        StringView view{};
+
+        view.begin = (u8*)begin;
+        view.length = length;
+        view.capacity = length;
+
+        return view;
+    }
+
+
     inline void zero_string(StringView& view)
     {
         view.length = 0;
@@ -216,6 +231,14 @@ namespace span
     inline void sprintf(StringView& view, cstr fmt, VA_ARGS... va_args)
     {
         view.length = (u32)qsnprintf(view.begin, (int)view.capacity, fmt, va_args...);
+    }
+
+
+    inline void copy_string(StringView const& src, StringView const& dst)
+    {
+        auto len = num::min(src.length, dst.length);
+        
+        copy_u8((u8*)src.begin, (u8*)dst.begin, len);
     }
 
 }

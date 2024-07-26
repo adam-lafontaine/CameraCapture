@@ -1,6 +1,8 @@
 #ifndef LIBUVC_H
 #define LIBUVC_H
 
+//#define LIBUVC_IMPLEMENTATION
+
 #define LIBUVC_HAS_JPEG 1
 
 #ifndef  NDEBUG
@@ -9691,7 +9693,7 @@ namespace uvc
 {
 namespace opt
 { 
-    enum class image_format : int
+    enum class jpeg_out_format : int
     {
         UNKNOWN,
         RGB8,
@@ -9712,7 +9714,7 @@ namespace opt
     };
     
 
-    static bool setup_jpeg(jpeg_info_t& jinfo, frame* jframe, image_format out_format)
+    static bool setup_jpeg(jpeg_info_t& jinfo, frame* jframe, jpeg_out_format out_format)
     {
         auto& jerr = jinfo.jerr;
         auto& dinfo = jinfo.dinfo;
@@ -9744,15 +9746,15 @@ namespace opt
 
         switch (out_format)
         {
-        case image_format::RGB8:
+        case jpeg_out_format::RGB8:
             dinfo.out_color_space = JCS_RGB;
             jinfo.out_step = jframe->width * 3;
             break;
-        case image_format::RGBA8:
+        case jpeg_out_format::RGBA8:
             dinfo.out_color_space = JCS_EXT_RGBA;
             jinfo.out_step = jframe->width * 4;
             break;
-        case image_format::GRAY8:
+        case jpeg_out_format::GRAY8:
             dinfo.out_color_space = JCS_GRAYSCALE;
             jinfo.out_step = jframe->width;
             break;
@@ -9766,7 +9768,7 @@ namespace opt
     }
     
 
-    static uvc_error_t mjpeg_convert(frame* in, u8* out, image_format out_format)
+    static uvc_error_t mjpeg_convert(frame* in, u8* out, jpeg_out_format out_format)
     {
         // not actually parallel
 
@@ -9811,7 +9813,7 @@ namespace opt
             return UVC_ERROR_NO_MEM;
         }
 
-        return opt::mjpeg_convert(in, out, image_format::RGBA8);
+        return opt::mjpeg_convert(in, out, jpeg_out_format::RGBA8);
     }
 
 
@@ -9822,7 +9824,7 @@ namespace opt
             return UVC_ERROR_NO_MEM;
         }
 
-        return opt::mjpeg_convert(in, out, image_format::GRAY8);
+        return opt::mjpeg_convert(in, out, jpeg_out_format::GRAY8);
     }
 
 #endif 

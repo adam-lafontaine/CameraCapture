@@ -1,9 +1,8 @@
 #pragma once
 
 #include "camera_usb.hpp"
-
-#define LIBUVC_IMPLEMENTATION
 #include "libuvc2.hpp"
+#include "../qsprintf/qsprintf.hpp"
 
 /*
 
@@ -30,25 +29,33 @@ namespace camera_usb
     constexpr u8 DEVICE_COUNT_MAX = 16;
 
 
-    class DeviceUVC
+    class DeviceConfigUVC
     {
     public:
-        uvc::device* p_device = nullptr;
-        uvc::device_handle* h_device = nullptr;
-        uvc::stream_ctrl ctrl;
-        uvc::stream_handle* h_stream = nullptr;
-
-        int device_id = -1;
-
-        int product_id = -1;
-        int vendor_id = -1;
-        
         u32 frame_width = 0;
         u32 frame_height = 0;
         u32 fps = 0;
 
         uvc::uvc_frame_format format;
-        u64 format_code;
+        char format_code[5] = { 0 };
+    };
+
+
+    class DeviceUVC
+    {
+    public:
+        int device_id = -1;
+
+        uvc::device* p_device = nullptr;
+        uvc::device_handle* h_device = nullptr;
+        uvc::stream_ctrl ctrl;
+        uvc::stream_handle* h_stream = nullptr;
+
+        char product_id[5] = { 0 };
+        char vendor_id[5] = { 0 };
+        char serial_number[32] = { 0 };
+        
+        DeviceConfigUVC config;
 
         bool is_connected = false;
         bool is_streaming = false;
@@ -100,67 +107,84 @@ namespace camera_usb
     }
 
 
-    static bool read_device_properties(DeviceUVC& device)
+    static bool read_device_config(DeviceUVC& device)
     {
-        if (!open_device(device))
-        {
-            assert(false && "Could not open device");
-            return false;
-        }
-
-        u32 width = 640;
-        u32 height = 480;
-        u32 fps = 30;
+        auto& config = device.config;
 
         const uvc::format_desc* format_desc = uvc::uvc_get_format_descs(device.h_device);
         const uvc::frame_desc* frame_desc = format_desc->frame_descs;
 
-        if (frame_desc) 
-        {
-            width = frame_desc->wWidth;
-            height = frame_desc->wHeight;
-            fps = 10'000'000 / frame_desc->dwDefaultFrameInterval;
+        if (!frame_desc) 
+        { 
+            return false;
         }
 
-        device.frame_width = width;
-        device.frame_height = height;
-        device.fps = fps;
+        //format_desc->bBitsPerPixel;
+
+        config.frame_width = frame_desc->wWidth;
+        config.frame_height = frame_desc->wHeight;
+        config.fps = 10'000'000 / frame_desc->dwDefaultFrameInterval;
+
+        qsnprintf(config.format_code, 5, "%s", (char*)format_desc->fourccFormat);
 
         uvc::frame_format frame_format;        
 
         switch (format_desc->bDescriptorSubtype) 
         {
         case uvc::UVC_VS_FORMAT_MJPEG:
-            frame_format = uvc::UVC_FRAME_FORMAT_MJPEG;        
+            frame_format = uvc::UVC_FRAME_FORMAT_MJPEG;
             break;
+        
         case uvc::UVC_VS_FORMAT_FRAME_BASED:
             frame_format = uvc::UVC_FRAME_FORMAT_H264;
             break;
+
         default:
             frame_format = uvc::UVC_FRAME_FORMAT_YUYV;
             break;
         }
 
-        device.format = frame_format;
+        config.format = frame_format;
 
-        device.format_code = 0;
-
-        SpanView<u8> src;
-        src.begin = (u8*)format_desc->fourccFormat;
-        src.length = 4;
-
-        SpanView<u8> dst;
-        dst.begin = (u8*)(&device.format_code);
-        dst.length = 4;
-
-        span::copy_span(src, dst);
-        
-
-        /*auto res = uvc::uvc_get_stream_ctrl_format_size(
+        auto res = uvc::uvc_get_stream_ctrl_format_size(
             device.h_device, &device.ctrl, // result stored in ctrl
-            frame_format,
-            width, height, fps // width, height, fps
-        );*/
+            config.format,
+            config.frame_width, 
+            config.frame_height, 
+            config.fps);
+
+        return res >= 0;
+    }
+    
+    
+    static bool read_device_properties(DeviceUVC& device)
+    {
+        uvc::device_descriptor* desc;
+
+        auto res = uvc::uvc_get_device_descriptor(device.p_device, &desc);
+        if (res != uvc::UVC_SUCCESS)
+        {
+            assert(false && "Could not find device");
+            return false;
+        }
+
+        qsnprintf(device.product_id, 5, "%04x", desc->idProduct);
+        qsnprintf(device.vendor_id, 5, "%04x", desc->idVendor);
+        qsnprintf(device.serial_number, 32, "%s", desc->serialNumber);
+            
+        uvc::uvc_free_device_descriptor(desc);        
+        
+        if (!open_device(device))
+        {
+            assert(false && "Could not open device");
+            return false;
+        }
+
+        if (!read_device_config(device))
+        {
+            assert(false && "Error getting device configuration");
+            return false;
+        }
 
         close_device(device);
 
@@ -175,7 +199,7 @@ namespace camera_usb
 {
     static bool enumerate_devices(DeviceListUVC& list)
     {
-        uvc::device_descriptor* desc;
+        
 
         auto res = uvc::uvc_init(&list.context, NULL);
         if (res != uvc::UVC_SUCCESS)
@@ -202,23 +226,11 @@ namespace camera_usb
         list.count = 0;
         for (int i = 0; list.device_list[i]; ++i) 
         {
-            auto p_device = list.device_list[i];
-
-            res = uvc::uvc_get_device_descriptor(p_device, &desc);
-            if (res != uvc::UVC_SUCCESS)
-            {
-                //print_uvc_error(res, "uvc_get_device_descriptor");
-                continue;
-            }
-
+            auto p_device = list.device_list[i]; 
             auto& device = list.devices[list.count];
 
             device.device_id = i;
-            device.p_device = p_device;
-            device.product_id = desc->idProduct;
-            device.vendor_id = desc->idVendor;
-            
-            uvc::uvc_free_device_descriptor(desc);
+            device.p_device = p_device;           
 
             read_device_properties(device);
 
@@ -240,12 +252,6 @@ namespace camera_usb
         {
             uvc::uvc_exit(list.context);
         }
-    }
-
-
-    static cstr decode_format_code(DeviceUVC const& device)
-    {
-        return (cstr)(&device.format_code);
     }
 }
 
@@ -277,12 +283,18 @@ namespace camera_usb
         {
             auto& camera = cameras.list[i];
             auto& device = uvc_list.devices[i];
+            auto& config = device.config;
 
             camera.id = device.device_id;
-            camera.frame_width = device.frame_width;
-            camera.frame_height = device.frame_height;
-            camera.fps = device.fps;
-            camera.format = decode_format_code(device);
+
+            camera.frame_width = config.frame_width;
+            camera.frame_height = config.frame_height;
+            camera.fps = config.fps;
+            camera.format = span::to_string_view(config.format_code);
+
+            camera.vendor = span::to_string_view(device.vendor_id);
+            camera.product = span::to_string_view(device.product_id);
+            camera.serial_number = span::to_string_view(device.serial_number);
         }
 
         return cameras;
@@ -294,3 +306,7 @@ namespace camera_usb
         close_devices(uvc_list);
     }
 }
+
+
+#define LIBUVC_IMPLEMENTATION
+#include "libuvc2.hpp"
