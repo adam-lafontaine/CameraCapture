@@ -14,7 +14,7 @@ namespace camera_usb
         Connected
     };
     
-    
+
     enum class CameraStatus : u8
     {
         Inactive = 0,
@@ -45,6 +45,7 @@ namespace camera_usb
         StringView label;
 
         CameraStatus status = CameraStatus::Inactive;
+        b8 busy = 0;
     };
 
 

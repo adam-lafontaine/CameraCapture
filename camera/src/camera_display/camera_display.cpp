@@ -43,65 +43,56 @@ namespace camera_display
 }
 
 
-/* threads */
-
 namespace camera_display
 {
-    static std::thread connect_th;
-    static bool connect_end = false;
-
-    static std::thread camera_th;
-    static bool camera_end = false;
-
-
-
-    static void join_threads(CameraState const& state)
+    static void open_camera_async(cam::Camera& camera)
     {
-        static bool connect = false;
+        std::thread th([&](){ cam::open_camera(camera); });
 
-        if (connect_end)
-        {
-            connect_th.join();
-            connect_end = false;
-        }
-
-        if (camera_end)
-        {
-            camera_th.join();
-            camera_end = false;
-        }
+        th.detach();
     }
-}
 
 
-namespace camera_display
-{
+    static void close_camera_async(cam::Camera& camera)
+    {
+        std::thread th([&](){ cam::close_camera(camera); });
+
+        th.detach();
+    }
+    
+    
     static void toggle_activate_async(cam::Camera& camera)
     {
         using S = cam::CameraStatus;
 
-        camera_th = std::thread([&]()
+        if (camera.busy)
         {
-            camera_end = false;
+            return;
+        }
 
-            switch (camera.status)
-            {
-            case S::Inactive:
-                return;
+        switch (camera.status)
+        {
+        case S::Inactive:
             
-            case S::Active:
-                cam::open_camera(camera);
-                break;
+            break;
+        
+        case S::Active:
+            open_camera_async(camera);
+            break;
 
-            default:
-                cam::close_camera(camera);
-                break;
-
-            }
-
-            camera_end = true;
-        });
+        default:
+            close_camera_async(camera);
+            break;
+        }
     }
+
+
+    class CameraCommand
+    {
+    public:
+        b8 toggle = 0;
+        int camera_id = -1;
+    };
 }
 
 
@@ -113,7 +104,7 @@ namespace camera_display
     }
 
 
-    static void camera_properties_table(cam::CameraList& cameras)
+    static void camera_properties_table(cam::CameraList& cameras, CameraCommand& cmd)
     {
         enum class columns : int
         {
@@ -152,7 +143,7 @@ namespace camera_display
             ImGui::TableHeadersRow();
         };
 
-        auto const table_row = [](cam::Camera& camera)
+        auto const table_row = [&](cam::Camera& camera)
         {
             ImGui::TableSetColumnIndex((int)columns::radio);
             ImGui::RadioButton(camera.label.begin, &camera_id, camera.id);
@@ -182,10 +173,16 @@ namespace camera_display
             ImGui::Text("%s", decode_status(camera.status));
 
             ImGui::TableSetColumnIndex((int)columns::activate);
-            if (ImGui::Button("Toggle"))
+            if (!camera.busy)
             {
-                toggle_activate_async(camera);
+                auto label = camera.status == cam::CameraStatus::Active ? "Turn On" : "Turn Off";
+                if (ImGui::Button(label))
+                {
+                    cmd.toggle = 1;
+                    cmd.camera_id = camera.id;
+                }
             }
+            
         };
 
         if (!ImGui::BeginTable("CameraPropertiesTable", (int)columns::count, table_flags, table_dims)) 
@@ -212,12 +209,12 @@ namespace camera_display
 {
     void init_async(CameraState& state)
     {
-        connect_th = std::thread([&]()
+        std::thread th([&]()
         {
-            connect_end = false;
             state.cameras = camera_usb::enumerate_cameras();
-            connect_end = true;
         });
+
+        th.detach();
     }
 
 
@@ -228,12 +225,16 @@ namespace camera_display
 
 
     void show_cameras(CameraState& state)
-    {   
-        join_threads(state);
-
-        camera_properties_table(state.cameras);
+    { 
+        CameraCommand cmd{};
+        camera_properties_table(state.cameras, cmd);
         
         ImGui::Text("%s", decode_status(state.cameras.status));
+
+        if (cmd.toggle)
+        {
+            toggle_activate_async(state.cameras.list[cmd.camera_id]);
+        }
         
     }
 }

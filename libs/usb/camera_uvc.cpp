@@ -140,21 +140,12 @@ namespace camera_usb
     }
 
 
-    static void close_stream(DeviceUVC& device)
-    {
-        if (device.h_stream)
-        {
-            uvc::uvc_stream_close(device.h_stream);
-            device.h_stream = nullptr;
-        }
-    }
-
-
     static void stop_stream(DeviceUVC& device)
     {
         if (device.h_stream)
         {
             uvc::uvc_stop_streaming(device.h_device);
+            device.h_stream = nullptr;
         }
     }
 
@@ -414,17 +405,6 @@ namespace camera_usb
     }
 
 
-    static void close_device_stream(DeviceUVC& device)
-    {
-        close_stream(device);
-
-        if (device.status > DeviceStatus::DeviceOpen)
-        {
-            device.status = DeviceStatus::DeviceOpen;
-        }
-    }
-
-
     static bool start_device_stream(DeviceUVC& device)
     {
         if (!start_stream_single_frame(device))
@@ -445,9 +425,9 @@ namespace camera_usb
     {
         stop_stream(device);
 
-        if (device.status > DeviceStatus::StreamOpen)
+        if (device.status > DeviceStatus::DeviceOpen)
         {
-            device.status = DeviceStatus::StreamOpen;
+            device.status = DeviceStatus::DeviceOpen;
         }
     }
 }
@@ -537,28 +517,35 @@ namespace camera_usb
 
     void close_camera(Camera& camera)
     {
+        camera.busy = 1;
+
         auto& device = uvc_list.devices[camera.id];
         stop_device_stream(device);
-        close_device_stream(device);
 
         camera.status = CameraStatus::Active;
+        camera.busy = 0;
     }
     
     
     bool open_camera(Camera& camera)
     {
+        camera.busy = 1;
+
         auto& device = uvc_list.devices[camera.id];
         if (!open_device_stream(device))
-        {            
+        {        
+            camera.busy = 0;    
             return false;
         }
 
         if (!start_device_stream(device))
         {
+            camera.busy = 0;
             return false;
         }
 
         camera.status = CameraStatus::Open;
+        camera.busy = 0;
 
         return true;
     }

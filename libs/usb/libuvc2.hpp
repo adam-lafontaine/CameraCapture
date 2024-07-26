@@ -3744,6 +3744,7 @@ namespace uvc
             mutex_wait(strmh->cb_mutex);
 
         } while (1);
+
         // Kick the user thread awake
         mutex_unlock_broadcast(strmh->cb_mutex);
 
