@@ -338,10 +338,11 @@ static bool main_init()
     SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
 #endif
 
+    // fullscreen window
     SDL_DisplayMode dm;
     SDL_GetCurrentDisplayMode(0, &dm);
 
-    window = ui::create_sdl_ogl_window("TITLE", dm.w, dm.h);    
+    window = ui::create_sdl_ogl_window("Camera", dm.w, dm.h);    
     if (!window)
     {
         sdl::print_error("Error: create_sdl_ogl_window()");

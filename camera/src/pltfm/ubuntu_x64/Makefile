@@ -167,7 +167,7 @@ sdl_input_c += $(numeric_h)
 #*** usb ***
 
 camera_usb_h := $(usb)/camera_usb.hpp
-libuvc_h     := $(usb)/libuvc2.hpp
+libuvc_h     := $(usb)/libuvc3.hpp
 
 camera_usb_c := $(usb)/camera_uvc.cpp
 camera_usb_c += $(camera_usb_h)

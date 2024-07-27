@@ -1,7 +1,7 @@
 #pragma once
 
 #include "camera_usb.hpp"
-#include "libuvc2.hpp"
+#include "libuvc3.hpp"
 #include "../qsprintf/qsprintf.hpp"
 #include "../util/numeric.hpp"
 
@@ -615,4 +615,4 @@ namespace camera_usb
 
 
 #define LIBUVC_IMPLEMENTATION
-#include "libuvc2.hpp"
+#include "libuvc3.hpp"
