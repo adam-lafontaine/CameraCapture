@@ -3,6 +3,7 @@
 #include "../../../libs/alloc_type/alloc_type.hpp"
 
 #include <cassert>
+#include <thread>
 
 namespace cam = camera_usb;
 
@@ -27,6 +28,8 @@ namespace app
         cam::CameraList camera_list;
         
         CameraId camera_id;
+
+        bool is_streaming;
     };
 
 
@@ -95,8 +98,45 @@ namespace app
         state.data_ = data;
 
         state.data_->camera_id.value = 0;
+        state.data_->is_streaming - false;
 
         return true;
+    }
+}
+
+
+namespace app
+{
+    static void start_stream(AppState& state)
+    {
+        auto const on_grab = [&](img::ImageView const& src)
+        {
+            img::copy(src, state.screen);
+        };
+
+        auto& data = get_data(state);
+        data.is_streaming = true;
+
+        auto const is_on = [&](){ return data.is_streaming; };
+
+        auto& camera = get_camera(state);
+
+        cam::stream_camera(camera, on_grab, is_on);
+    }
+
+
+    static void start_stream_async(AppState& state)
+    {
+        std::thread th([&](){start_stream(state); });
+
+        th.detach();
+    }
+
+
+    static void stop_stream(AppState& state)
+    {
+        auto& data = get_data(state);
+        data.is_streaming = false;
     }
 }
 
@@ -177,7 +217,11 @@ namespace app
         }
         else if (input.keyboard.kbd_3.pressed)
         {
-            
+            start_stream_async(state);
+        }
+        else if (input.keyboard.kbd_4.pressed)
+        {
+            stop_stream(state);
         }
     }
 
