@@ -120,9 +120,8 @@ namespace
     idsp::IOState io_state{};
     cdsp::CameraState camera_state{};
 
-
     img::Buffer32 camera_buffer;
-    img::ImageView camera_view;
+    
 
     constexpr u32 N_OGL_TEXTURES = 2;
     constexpr ogl::TextureId input_texture_id = { 0 };
@@ -291,7 +290,7 @@ static void render_imgui_frame()
 #endif
 
     ui_input_window(textures.data[input_texture_id.value], io_state.display.width, io_state.display.height, 2.0f);
-    ui_camera_window(textures.data[camera_texture_id.value], camera_view.width, camera_view.height, 1.0f);
+    ui_camera_window(textures.data[camera_texture_id.value], camera_state.display.width, camera_state.display.height, 1.0f);
     ui_camera_controls_window(camera_state);
 
     ui_diagnostics_window();
@@ -388,12 +387,16 @@ static bool main_init()
         return false;
     }
 
+    
+
     // TODO init camera app
     u32 w = 1280;
     u32 h = 720;
     camera_buffer = img::create_buffer32(w * h, "camera temp");
-    camera_view = img::make_view(w, h, camera_buffer);
-    img::fill(camera_view, img::to_pixel(128));
+    camera_state.display = img::make_view(w, h, camera_buffer);
+    img::fill(camera_state.display, img::to_pixel(128));
+
+    cdsp::init_async(camera_state);
 
     return true;
 }
@@ -424,7 +427,7 @@ static void main_loop()
 
     //auto game_view = img::make_view(camera_image);
 
-    cdsp::init_async(camera_state);
+    
 
     main_sw.start();
     
@@ -446,7 +449,7 @@ static void main_loop()
         //ui_state.app_frame_ns = camera_sw.get_time_nano();
 
         render_input_display(io_state.display);
-        render_camera(camera_view);
+        render_camera(camera_state.display);
 
         render_imgui_frame();        
 

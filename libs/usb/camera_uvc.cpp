@@ -3,6 +3,11 @@
 #include "camera_usb.hpp"
 #include "libuvc2.hpp"
 #include "../qsprintf/qsprintf.hpp"
+#include "../util/numeric.hpp"
+
+#include <cassert>
+
+namespace num = numeric;
 
 /*
 
@@ -71,6 +76,8 @@ namespace camera_usb
         DeviceConfigUVC config;
 
         DeviceStatus status = DeviceStatus::Inactive;
+
+        img::ImageView rgba;
     };
 
 
@@ -83,6 +90,8 @@ namespace camera_usb
         DeviceUVC devices[DEVICE_COUNT_MAX] = { 0 };
 
         u32 count = 0;
+
+        img::Buffer32 rgba_data;
 
     };
 
@@ -321,7 +330,9 @@ namespace camera_usb
         {
             uvc::uvc_exit(list.context);
             return false;
-        }
+        }        
+
+        u32 max_pixels = 0;
 
         list.count = 0;
         for (int i = 0; list.device_list[i]; ++i) 
@@ -337,6 +348,13 @@ namespace camera_usb
             device.status = DeviceStatus::Active;
 
             ++list.count;
+
+            max_pixels = num::max(max_pixels, device.config.frame_width * device.config.frame_height);
+        }
+
+        if (max_pixels)
+        {
+            list.rgba_data = img::create_buffer32(max_pixels, "uvc rbga_data");
         }
 
         return list.count > 0;
@@ -365,6 +383,8 @@ namespace camera_usb
         {
             uvc::uvc_exit(list.context);
         }
+
+        mb::destroy_buffer(list.rgba_data);
     }
 }
 
@@ -429,6 +449,30 @@ namespace camera_usb
         {
             device.status = DeviceStatus::DeviceOpen;
         }
+    }
+
+
+    static bool grab_and_convert_frame_rgba(DeviceUVC& device)
+    {
+        uvc::frame* in_frame;
+
+        auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
+
+        assert(false && "*** get frame ***");
+        
+        if (res != uvc::UVC_SUCCESS)
+        {  
+            return false;
+        }
+
+        
+
+        auto dst = (u8*)device.rgba.matrix_data_;
+
+        // todo
+        res = uvc::opt::mjpeg2rgba(in_frame, dst);
+        
+        return res == uvc::UVC_SUCCESS;
     }
 }
 
@@ -520,10 +564,13 @@ namespace camera_usb
         camera.busy = 1;
 
         auto& device = uvc_list.devices[camera.id];
-        stop_device_stream(device);
+        //stop_device_stream(device); // hangs
 
-        camera.status = CameraStatus::Active;
+        //camera.status = CameraStatus::Active;
         camera.busy = 0;
+
+        // only one at a time
+        mb::reset_buffer(uvc_list.rgba_data);
     }
     
     
@@ -544,6 +591,8 @@ namespace camera_usb
             return false;
         }
 
+        device.rgba = img::make_view(camera.frame_width, camera.frame_height, uvc_list.rgba_data);
+
         camera.status = CameraStatus::Open;
         camera.busy = 0;
 
@@ -551,9 +600,24 @@ namespace camera_usb
     }
 
 
-    void stream_camera(Camera& camera)
+    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition)
     {
         auto& device = uvc_list.devices[camera.id];
+
+        while (stream_condition())
+        {
+            if (grab_and_convert_frame_rgba(device))
+            {
+                on_grab(device.rgba);
+                assert(false && "*** testing ***");
+            }
+            else
+            {
+                assert(false && "*** grab failed ***");
+            }
+        }
+
+        assert(false && "*** over ***");
     }
 }
 

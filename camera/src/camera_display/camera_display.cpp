@@ -45,30 +45,59 @@ namespace camera_display
 
 namespace camera_display
 {
-    static void open_camera_async(cam::Camera& camera)
+    static void open_camera(CameraState& state, cam::Camera& camera)
     {
-        std::thread th([&](){ cam::open_camera(camera); });
+        if (!cam::open_camera(camera))
+        {
+            assert(false && "*** did not open camera ***");
+            return;
+        }
 
-        th.detach();
+        auto const is_on = [&](){ return state.is_streaming; };
+
+        auto const on_grab = [&](img::ImageView const& frame){ img::copy(frame, state.display); };
+
+        state.is_streaming = true;
+
+        cam::stream_camera(camera, on_grab, is_on);
     }
 
 
-    static void close_camera_async(cam::Camera& camera)
+    static void open_camera_async(CameraState& state, cam::Camera& camera)
     {
-        std::thread th([&](){ cam::close_camera(camera); });
-
-        th.detach();
-    }
-    
-    
-    static void toggle_activate_async(cam::Camera& camera)
-    {
-        using S = cam::CameraStatus;
-
         if (camera.busy)
         {
             return;
         }
+
+        std::thread th([&](){ open_camera(state, camera); });
+
+        th.detach();
+    }
+
+
+    static void close_camera_async(CameraState& state, cam::Camera& camera)
+    {
+        if (camera.busy)
+        {
+            return;
+        }
+
+        std::thread th([&]()
+        { 
+            state.is_streaming = false;
+            cam::close_camera(camera); 
+        });
+
+        th.detach();
+    }
+    
+    
+    static void toggle_activate_async(CameraState& state, cam::Camera& camera)
+    {
+        b8 busy = 0;
+
+        using S = cam::CameraStatus;
 
         switch (camera.status)
         {
@@ -77,12 +106,23 @@ namespace camera_display
             break;
         
         case S::Active:
-            open_camera_async(camera);
+            open_camera_async(state, camera);
+            busy = 1;
             break;
 
         default:
-            close_camera_async(camera);
+            close_camera_async(state, camera);
+            busy = 0;
             break;
+        }
+
+        for (u32 i = 0; i < state.cameras.count; i++)
+        {
+            auto& c = state.cameras.list[i];
+            if (c.id != camera.id)
+            {
+                c.busy = busy;
+            }
         }
     }
 
@@ -233,7 +273,7 @@ namespace camera_display
 
         if (cmd.toggle)
         {
-            toggle_activate_async(state.cameras.list[cmd.camera_id]);
+            toggle_activate_async(state, state.cameras.list[cmd.camera_id]);
         }
         
     }

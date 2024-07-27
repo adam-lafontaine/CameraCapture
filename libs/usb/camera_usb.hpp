@@ -2,6 +2,8 @@
 
 #include "../image/image.hpp"
 
+namespace img = image;
+
 
 /* status enum */
 
@@ -60,6 +62,10 @@ namespace camera_usb
     };
 
 
+    using bool_fn = std::function<bool()>;
+    using grab_cb = std::function<void(image::ImageView const&)>;
+
+
     CameraList enumerate_cameras();
 
     void close(CameraList& cameras);
@@ -69,5 +75,5 @@ namespace camera_usb
 
     bool open_camera(Camera& camera);
 
-    void stream_camera(Camera& camera);
+    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition);
 }

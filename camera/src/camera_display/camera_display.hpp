@@ -14,9 +14,14 @@ namespace camera_display
     class CameraState
     {
     public:
-        cam::CameraList cameras;
 
-        bool is_connected() const { return cameras.status == cam::ConnectionStatus::Connected; }        
+        img::ImageView display;
+
+        cam::CameraList cameras;        
+
+        bool is_connected() const { return cameras.status == cam::ConnectionStatus::Connected; }
+
+        bool is_streaming = false;
 
     };
 
