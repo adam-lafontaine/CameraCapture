@@ -49,7 +49,6 @@ namespace camera_display
     {
         if (!cam::open_camera(camera))
         {
-            assert(false && "*** did not open camera ***");
             return;
         }
 
@@ -131,6 +130,7 @@ namespace camera_display
     {
     public:
         b8 toggle = 0;
+        b8 acquire = 0;
         int camera_id = -1;
     };
 }
@@ -249,12 +249,14 @@ namespace camera_display
 {
     void init_async(CameraState& state)
     {
-        std::thread th([&]()
+        /*std::thread th([&]()
         {
             state.cameras = camera_usb::enumerate_cameras();
         });
 
-        th.detach();
+        th.detach();*/
+
+        state.cameras = camera_usb::enumerate_cameras();
     }
 
 

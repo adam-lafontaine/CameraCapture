@@ -457,15 +457,10 @@ namespace camera_usb
         uvc::frame* in_frame;
 
         auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
-
-        assert(false && "*** get frame ***");
-        
         if (res != uvc::UVC_SUCCESS)
         {  
             return false;
-        }
-
-        
+        }        
 
         auto dst = (u8*)device.rgba.matrix_data_;
 
@@ -609,15 +604,8 @@ namespace camera_usb
             if (grab_and_convert_frame_rgba(device))
             {
                 on_grab(device.rgba);
-                assert(false && "*** testing ***");
-            }
-            else
-            {
-                assert(false && "*** grab failed ***");
             }
         }
-
-        assert(false && "*** over ***");
     }
 }
 
