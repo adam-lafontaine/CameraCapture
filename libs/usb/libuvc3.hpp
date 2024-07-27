@@ -679,14 +679,8 @@ namespace uvc
                                     uvc_frame_callback_t *cb,
                                     void *user_ptr,
                                     uint8_t flags);
-    uvc_error_t uvc_stream_start_iso(uvc_stream_handle_t *strmh,
-                                        uvc_frame_callback_t *cb,
-                                        void *user_ptr);
+                                    
 
-    uvc_error_t uvc_stream_get_frame_old(
-        uvc_stream_handle_t *strmh,
-        uvc_frame_t **frame,
-        int32_t timeout_us);
 
     uvc_error_t uvc_stream_get_frame(
         uvc_stream_handle_t *strmh,
@@ -986,42 +980,6 @@ namespace uvc
     static void mutex_wait(mutex_t& mtx)
     {
         pthread_cond_wait(&mtx.cond, &mtx.mutex);
-    }
-
-
-    static int mutex_wait_for(mutex_t& mtx, int32_t timeout_us)
-    {
-        // implementation moved here from uvc_stream_get_frame().
-        // not used
-        time_t add_secs;
-        time_t add_nsecs;
-        struct timespec ts;
-
-        add_secs = timeout_us / 1000000;
-        add_nsecs = (timeout_us % 1000000) * 1000;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 0;
-
-    #if _POSIX_TIMERS > 0
-        clock_gettime(CLOCK_REALTIME, &ts);
-    #else
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-        ts.tv_sec = tv.tv_sec;
-        ts.tv_nsec = tv.tv_usec * 1000;
-    #endif
-
-        ts.tv_sec += add_secs;
-        ts.tv_nsec += add_nsecs;
-
-        /* pthread_cond_timedwait FAILS with EINVAL if ts.tv_nsec > 1000000000 (1 billion)
-            * Since we are just adding values to the timespec, we have to increment the seconds if nanoseconds is greater than 1 billion,
-            * and then re-adjust the nanoseconds in the correct range.
-            * */
-        ts.tv_sec += ts.tv_nsec / 1000000000;
-        ts.tv_nsec = ts.tv_nsec % 1000000000;
-
-        return pthread_cond_timedwait(&mtx.cond, &mtx.mutex, &ts);
     }
 
 
@@ -3443,25 +3401,7 @@ namespace uvc
         UVC_EXIT(ret);
         return ret;
     }
-
-    /** Begin streaming video from the stream into the callback function.
-     * @ingroup streaming
-     *
-     * @deprecated The stream type (bulk vs. isochronous) will be determined by the
-     * type of interface associated with the uvc_stream_ctrl_t parameter, regardless
-     * of whether the caller requests isochronous streaming. Please switch to
-     * uvc_stream_start().
-     *
-     * @param strmh UVC stream
-     * @param cb   User callback function. See {uvc_frame_callback_t} for restrictions.
-     */
-    uvc_error_t uvc_stream_start_iso(
-        uvc_stream_handle_t *strmh,
-        uvc_frame_callback_t *cb,
-        void *user_ptr)
-    {
-        return uvc_stream_start(strmh, cb, user_ptr, 0);
-    }
+    
 
     /** @internal
      * @brief User callback runner thread
@@ -3569,77 +3509,7 @@ namespace uvc
             frame->metadata_bytes = strmh->meta_hold_bytes;
             memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
         }
-    }
-
-    /** Poll for a frame
-     * @ingroup streaming
-     *
-     * @param devh UVC device
-     * @param[out] frame Location to store pointer to captured frame (NULL on error)
-     * @param timeout_us >0: Wait at most N microseconds; 0: Wait indefinitely; -1: return immediately
-     */
-    uvc_error_t uvc_stream_get_frame_old(uvc_stream_handle_t *strmh,
-                                     uvc_frame_t **frame,
-                                     int32_t timeout_us)
-    {
-        time_t add_secs;
-        time_t add_nsecs;
-        struct timespec ts;
-
-        if (!strmh->running)
-            return UVC_ERROR_INVALID_PARAM;
-
-        if (strmh->user_cb)
-            return UVC_ERROR_CALLBACK_EXISTS;
-            
-        mutex_lock(strmh->cb_mutex);
-
-        if (strmh->last_polled_seq < strmh->hold_seq)
-        {
-            _uvc_populate_frame(strmh);
-            *frame = &strmh->frame;
-            strmh->last_polled_seq = strmh->hold_seq;
-        }
-        else if (timeout_us == -1)
-        {
-            *frame = NULL;
-        }
-        else
-        {
-            if (timeout_us == 0)
-            {
-                mutex_wait(strmh->cb_mutex);
-            }
-            else
-            {
-                int err = mutex_wait_for(strmh->cb_mutex, timeout_us);
-
-                // TODO: How should we handle EINVAL?
-                if (err)
-                {
-                    *frame = NULL;
-                    mutex_unlock(strmh->cb_mutex);
-                    
-                    return err == ETIMEDOUT ? UVC_ERROR_TIMEOUT : UVC_ERROR_OTHER;
-                }
-            }
-
-            if (strmh->last_polled_seq < strmh->hold_seq)
-            {
-                _uvc_populate_frame(strmh);
-                *frame = &strmh->frame;
-                strmh->last_polled_seq = strmh->hold_seq;
-            }
-            else
-            {
-                *frame = NULL;
-            }
-        }
-        
-        mutex_unlock(strmh->cb_mutex);
-
-        return UVC_SUCCESS;
-    }
+    }   
 
 
     /** Poll for a frame
@@ -3744,6 +3614,7 @@ namespace uvc
             mutex_wait(strmh->cb_mutex);
 
         } while (1);
+
         // Kick the user thread awake
         mutex_unlock_broadcast(strmh->cb_mutex);
 

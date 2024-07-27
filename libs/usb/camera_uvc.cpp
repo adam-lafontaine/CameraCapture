@@ -1,8 +1,13 @@
 #pragma once
 
 #include "camera_usb.hpp"
-#include "libuvc2.hpp"
+#include "libuvc3.hpp"
 #include "../qsprintf/qsprintf.hpp"
+#include "../util/numeric.hpp"
+
+#include <cassert>
+
+namespace num = numeric;
 
 /*
 
@@ -27,6 +32,17 @@ namespace camera_usb
 
 
     constexpr u8 DEVICE_COUNT_MAX = 16;
+
+
+    enum class DeviceStatus : u8
+    {
+        Inactive = 0,
+        Active,
+        DeviceOpen,
+        StreamOpen,
+        StreamReady,
+        StreamRunning
+    };
 
 
     class DeviceConfigUVC
@@ -59,8 +75,9 @@ namespace camera_usb
         
         DeviceConfigUVC config;
 
-        bool is_connected = false;
-        bool is_streaming = false;
+        DeviceStatus status = DeviceStatus::Inactive;
+
+        img::ImageView rgba;
     };
 
 
@@ -74,6 +91,8 @@ namespace camera_usb
 
         u32 count = 0;
 
+        img::Buffer32 rgba_data;
+
     };
 
 
@@ -85,7 +104,7 @@ namespace camera_usb
 }
 
 
-/*  */
+/* wrappers */
 
 namespace camera_usb
 {
@@ -109,8 +128,99 @@ namespace camera_usb
     }
 
 
+    static bool load_device_config(DeviceUVC& device)
+    {
+        if (!device.h_device)
+        {
+            assert(false && "Device not open");
+            return false;
+        }
+
+        // test to see if config exists
+        auto res = uvc::uvc_get_stream_ctrl_format_size(
+            device.h_device, 
+            &device.ctrl, // result stored in ctrl
+            device.config.format,
+            device.config.frame_width, 
+            device.config.frame_height, 
+            device.config.fps);
+
+        return res >= 0;
+    }
+
+
+    static void close_stream(DeviceUVC& device)
+    {
+        if (device.h_stream)
+        {
+            uvc::uvc_stop_streaming(device.h_device);
+            device.h_stream = nullptr;
+        }
+    }
+
+
+    static bool open_stream(DeviceUVC& device)
+    {
+        if (!device.h_device)
+        {
+            assert(false && "Device not open");
+            return false;
+        }
+
+        auto res = uvc::uvc_stream_open_ctrl(device.h_device, &device.h_stream, &device.ctrl);
+        
+        return res == uvc::UVC_SUCCESS;
+    }
+
+
+    static bool start_stream_single_frame(DeviceUVC& device)
+    {
+        if (!device.h_stream)
+        {
+            assert(false && "Stream not open");
+        }
+
+        auto res = uvc::uvc_stream_start(device.h_stream, 0, (void*)12345, 0);
+
+        return res == uvc::UVC_SUCCESS;
+    }
+
+
+    static void enable_exposure_mode(DeviceUVC const& device)
+    {
+        constexpr u8 EXPOSURE_MODE_AUTO = 2;
+        constexpr u8 EXPOSURE_MODE_APERTURE = 8;
+
+        auto res = uvc::uvc_set_ae_mode(device.h_device, EXPOSURE_MODE_AUTO);
+        if (res == uvc::UVC_SUCCESS)
+        {
+            return;
+        }
+
+        if (res == uvc::UVC_ERROR_PIPE)
+        {
+            res = uvc::uvc_set_ae_mode(device.h_device, EXPOSURE_MODE_APERTURE);
+            if (res != uvc::UVC_SUCCESS)
+            {
+                // meh
+            }
+        }
+    }
+}
+
+
+/* device setup */
+
+namespace camera_usb
+{
     static bool read_device_config(DeviceUVC& device)
     {
+        if (!device.h_device)
+        {
+            assert(false && "Device not open");
+            return false;
+        }
+
         auto& config = device.config;
 
         const uvc::format_desc* format_desc = uvc::uvc_get_format_descs(device.h_device);
@@ -123,8 +233,9 @@ namespace camera_usb
 
         //format_desc->bBitsPerPixel;
 
-        config.frame_width = frame_desc->wWidth;
-        config.frame_height = frame_desc->wHeight;
+        // this may break if camera does not support dimensions
+        config.frame_width = num::min(WIDTH_MAX, (u32)frame_desc->wWidth);
+        config.frame_height = num::min(HEIGHT_MAX, (u32)frame_desc->wHeight);
         config.fps = 10'000'000 / frame_desc->dwDefaultFrameInterval;
 
         qsnprintf(config.format_code, 5, "%s", (char*)format_desc->fourccFormat);
@@ -148,14 +259,7 @@ namespace camera_usb
 
         config.format = frame_format;
 
-        auto res = uvc::uvc_get_stream_ctrl_format_size(
-            device.h_device, &device.ctrl, // result stored in ctrl
-            config.format,
-            config.frame_width, 
-            config.frame_height, 
-            config.fps);
-
-        return res >= 0;
+        return load_device_config(device);
     }
     
     
@@ -180,20 +284,6 @@ namespace camera_usb
 
         qsnprintf(device.label, 32, "%c", label_ch);
         ++label_ch;
-        
-        if (!open_device(device))
-        {
-            assert(false && "Could not open device");
-            return false;
-        }
-
-        if (!read_device_config(device))
-        {
-            assert(false && "Error getting device configuration");
-            return false;
-        }
-
-        close_device(device);
 
         return true;
     }
@@ -204,10 +294,8 @@ namespace camera_usb
 
 namespace camera_usb
 {
-    static bool enumerate_devices(DeviceListUVC& list)
+    static bool enumerate_activate_devices(DeviceListUVC& list)
     {
-        
-
         auto res = uvc::uvc_init(&list.context, NULL);
         if (res != uvc::UVC_SUCCESS)
         {
@@ -230,6 +318,8 @@ namespace camera_usb
             return false;
         }
 
+        u32 max_pixels = 0;
+
         list.count = 0;
         for (int i = 0; list.device_list[i]; ++i) 
         {
@@ -241,7 +331,16 @@ namespace camera_usb
 
             read_device_properties(device);
 
+            device.status = DeviceStatus::Active;
+
             ++list.count;
+
+            max_pixels = num::max(max_pixels, device.config.frame_width * device.config.frame_height);
+        }
+
+        if (max_pixels)
+        {
+            list.rgba_data = img::create_buffer32(max_pixels, "uvc rbga_data");
         }
 
         return list.count > 0;
@@ -250,6 +349,17 @@ namespace camera_usb
 
     static void close_devices(DeviceListUVC& list)
     {
+        for (int i = 0; i < list.count; ++i)
+        {
+            auto& device = list.devices[i];
+            close_stream(device);
+            close_device(device);
+            uvc::uvc_unref_device(device.p_device);
+            device.p_device = nullptr;
+
+            device.status = DeviceStatus::Inactive;
+        }
+
         if (list.device_list)
         {
             uvc::uvc_free_device_list(list.device_list, 0);
@@ -259,6 +369,86 @@ namespace camera_usb
         {
             uvc::uvc_exit(list.context);
         }
+
+        mb::destroy_buffer(list.rgba_data);
+    }
+}
+
+
+/*  */
+
+namespace camera_usb
+{
+    static bool open_device_stream(DeviceUVC& device)
+    {
+        if (!open_device(device))
+        {
+            assert(false && "Could not open device");
+            return false;
+        }
+
+        if (!read_device_config(device))
+        {
+            assert(false && "Error getting device configuration");
+            close_device(device);
+            return false;
+        }
+
+        if (!open_stream(device))
+        {
+            assert(false && "Could not open stream");
+            return false;
+        }        
+
+        device.status = DeviceStatus::StreamOpen;
+
+        return true;
+    }
+
+
+    static bool start_device_stream(DeviceUVC& device)
+    {
+        if (!start_stream_single_frame(device))
+        {
+            assert(false && "Could not start stream");
+            return false;
+        }
+
+        enable_exposure_mode(device);
+
+        device.status = DeviceStatus::StreamReady;
+
+        return true;
+    }
+
+
+    static void close_device_stream(DeviceUVC& device)
+    {
+        close_stream(device);
+
+        if (device.status > DeviceStatus::DeviceOpen)
+        {
+            device.status = DeviceStatus::DeviceOpen;
+        }
+    }
+
+
+    static bool grab_and_convert_frame_rgba(DeviceUVC& device)
+    {
+        uvc::frame* in_frame;
+
+        auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
+        if (res != uvc::UVC_SUCCESS)
+        {  
+            return false;
+        }        
+
+        auto dst = (u8*)device.rgba.matrix_data_;
+
+        // todo
+        res = uvc::opt::mjpeg2rgba(in_frame, dst);
+        
+        return res == uvc::UVC_SUCCESS;
     }
 }
 
@@ -268,6 +458,24 @@ namespace camera_usb
 namespace camera_usb
 {
     DeviceListUVC uvc_list;
+
+
+    static DeviceUVC find_device(Camera const& camera)
+    {
+        for (u32 i = 0; i < uvc_list.count; i++)
+        {
+            auto& device = uvc_list.devices[i];
+            if (device.device_id == camera.id)
+            {
+                return device;
+            }
+        }
+
+        DeviceUVC empty{};
+        empty.device_id = -1;
+
+        return empty;
+    }
 }
 
 
@@ -278,45 +486,133 @@ namespace camera_usb
     CameraList enumerate_cameras()
     {
         CameraList cameras;
+        cameras.status = ConnectionStatus::Connecting;
 
-        if (!enumerate_devices(uvc_list))
+        auto n_pixels = WIDTH_MAX * HEIGHT_MAX;
+        uvc_list.rgba_data = img::create_buffer32(n_pixels, "uvc rgba");
+        if (!uvc_list.rgba_data.ok)
         {
             cameras.count = 0;
+            cameras.status = ConnectionStatus::Disconnected;
             return cameras;
         }
 
-
+        if (!enumerate_activate_devices(uvc_list))
+        {
+            cameras.count = 0;
+            cameras.status = ConnectionStatus::Disconnected;
+            return cameras;
+        }
 
         cameras.count = uvc_list.count;
         for (u32 i = 0; i < cameras.count; i++)
         {
             auto& camera = cameras.list[i];
-            auto& device = uvc_list.devices[i];
-            auto& config = device.config;
+            auto& device = uvc_list.devices[i];            
 
             camera.id = device.device_id;
-
-            camera.frame_width = config.frame_width;
-            camera.frame_height = config.frame_height;
-            camera.fps = config.fps;
-            camera.format = span::to_string_view(config.format_code);
+            camera.status = CameraStatus::Active;
 
             camera.vendor = span::to_string_view(device.vendor_id);
             camera.product = span::to_string_view(device.product_id);
             camera.serial_number = span::to_string_view(device.serial_number);
             camera.label = span::to_string_view(device.label);
+
+            camera.format = span::to_string_view("XXXX");
         }
+
+        cameras.status = ConnectionStatus::Connected;
 
         return cameras;
     }
 
 
-    void close()
+    void close(CameraList& cameras)
     {
         close_devices(uvc_list);
+
+        for (u32 i = 0; i < cameras.count; i++)
+        {
+            auto& camera = cameras.list[i];
+            camera.id = -1;
+            camera.status = CameraStatus::Inactive;
+        }
+    }
+  
+    
+    bool open_camera(Camera& camera)
+    {
+        camera.busy = 1;
+
+        auto& device = uvc_list.devices[camera.id];
+        if (!open_device_stream(device))
+        {        
+            camera.busy = 0;    
+            return false;
+        }
+        
+        auto& config = device.config;
+        camera.frame_width = config.frame_width;
+        camera.frame_height = config.frame_height;
+        camera.fps = config.fps;
+        camera.format = span::to_string_view(config.format_code);
+
+        if (!start_device_stream(device))
+        {
+            camera.busy = 0;
+            return false;
+        }
+
+        // only one at a time
+        mb::reset_buffer(uvc_list.rgba_data);
+
+        device.rgba = img::make_view(camera.frame_width, camera.frame_height, uvc_list.rgba_data);
+
+        camera.status = CameraStatus::Open;
+        camera.busy = 0;
+
+        return true;
+    }
+
+
+    void grab_image(Camera& camera, img::ImageView const& dst)
+    {
+        camera.busy = 1;
+        auto& device = uvc_list.devices[camera.id];
+
+        if (grab_and_convert_frame_rgba(device))
+        {
+            img::copy(device.rgba, dst);
+        }
+        else
+        {
+            img::fill(dst, img::to_pixel(0, 0, 255));
+        }
+
+        camera.busy = 0;
+    }
+
+
+    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition)
+    {
+        auto& device = uvc_list.devices[camera.id];
+
+        auto status = camera.status;
+
+        camera.status = CameraStatus::Streaming;
+
+        while (stream_condition())
+        {
+            if (grab_and_convert_frame_rgba(device))
+            {
+                on_grab(device.rgba);
+            }
+        }
+
+        camera.status = status;
     }
 }
 
 
 #define LIBUVC_IMPLEMENTATION
-#include "libuvc2.hpp"
+#include "libuvc3.hpp"

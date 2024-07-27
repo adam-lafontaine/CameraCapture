@@ -2,6 +2,39 @@
 
 #include "../image/image.hpp"
 
+namespace img = image;
+
+
+/* constants */
+
+namespace camera_usb
+{
+    constexpr u32 WIDTH_MAX = 1280;
+    constexpr u32 HEIGHT_MAX = 720;
+}
+
+
+/* status enum */
+
+namespace camera_usb
+{
+    enum class ConnectionStatus : u8
+    {
+        Disconnected = 0,
+        Connecting,
+        Connected
+    };
+    
+
+    enum class CameraStatus : u8
+    {
+        Inactive = 0,
+        Active,
+        Open,
+        Streaming
+    };
+}
+
 
 namespace camera_usb
 {
@@ -21,6 +54,11 @@ namespace camera_usb
         StringView serial_number;
 
         StringView label;
+
+        CameraStatus status = CameraStatus::Inactive;
+        b8 busy = 0;
+
+        bool is_open() const { return status >= CameraStatus::Open; }
     };
 
 
@@ -30,10 +68,22 @@ namespace camera_usb
         Camera list[16];
 
         u32 count = 0;
+
+        ConnectionStatus status = ConnectionStatus::Disconnected;
     };
+
+
+    using bool_fn = std::function<bool()>;
+    using grab_cb = std::function<void(image::ImageView const&)>;
 
 
     CameraList enumerate_cameras();
 
-    void close();
+    void close(CameraList& cameras);
+
+    bool open_camera(Camera& camera);
+
+    void grab_image(Camera& camera, img::ImageView const& dst);
+
+    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition);
 }

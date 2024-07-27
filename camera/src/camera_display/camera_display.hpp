@@ -8,20 +8,20 @@ namespace cam = camera_usb;
 
 namespace camera_display
 {
-    enum class ConnectionStatus : u8
-    {
-        Disconnected,
-        Connecting,
-        Connected
-    };
+    
 
 
     class CameraState
     {
     public:
-        cam::CameraList cameras;
 
-        ConnectionStatus connection = ConnectionStatus::Disconnected;
+        img::ImageView display;
+
+        cam::CameraList cameras;        
+
+        bool is_connected() const { return cameras.status == cam::ConnectionStatus::Connected; }
+
+        bool is_streaming = false;
 
     };
 

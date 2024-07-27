@@ -239,6 +239,29 @@ namespace image
 }
 
 
+/* copy */
+
+namespace image
+{
+    template <class VIEW_S, class VIEW_D>
+    static void copy_view(VIEW_S const& src, VIEW_D const& dst)
+    {
+        sp::copy_span(to_span(src), to_span(dst));
+    }
+
+
+    void copy(ImageView const& src, ImageView const& dst)
+    {
+        assert(src.matrix_data_);
+        assert(dst.matrix_data_);
+        assert(dst.width == src.width);
+        assert(dst.height == src.height);
+
+        copy_view(src, dst);
+    }
+}
+
+
 /* transform static */
 
 namespace image

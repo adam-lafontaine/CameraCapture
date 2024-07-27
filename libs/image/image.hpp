@@ -225,6 +225,14 @@ namespace image
 }
 
 
+/* copy */
+
+namespace image
+{
+    void copy(ImageView const& src, ImageView const& dst);
+}
+
+
 /* transform */
 
 namespace image
