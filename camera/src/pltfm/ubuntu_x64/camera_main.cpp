@@ -392,7 +392,7 @@ static bool main_init()
     // TODO init camera app
     u32 w = 1280;
     u32 h = 720;
-    camera_buffer = img::create_buffer32(w * h, "camera temp");
+    camera_buffer = img::create_buffer32(w * h, "camera display");
     camera_state.display = img::make_view(w, h, camera_buffer);
     img::fill(camera_state.display, img::to_pixel(128));
 
