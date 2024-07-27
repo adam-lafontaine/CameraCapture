@@ -22,8 +22,8 @@ namespace memory_buffer
 	template <typename T>
 	inline bool create_buffer(MemoryBuffer<T>& buffer, u32 n_elements, cstr tag)
 	{
-		assert(n_elements);
-		assert(!buffer.data_);
+		assert(n_elements && " *** no elements ***");
+		assert(!buffer.data_ && " *** buffer already allocated *** ");
 
 		if (n_elements == 0 || buffer.data_)
 		{
@@ -31,7 +31,7 @@ namespace memory_buffer
 		}
 
 		buffer.data_ = mem::malloc<T>(n_elements, tag);
-		assert(buffer.data_);
+		assert(buffer.data_ && " *** allocation error *** ");
 
 		if (!buffer.data_)
 		{
@@ -87,7 +87,7 @@ namespace memory_buffer
 	template <typename T>
 	inline T* push_elements(MemoryBuffer<T>& buffer, u32 n_elements)
 	{
-		assert(n_elements);
+		assert(n_elements && " *** no elements *** ");
 
 		if (n_elements == 0)
 		{
@@ -103,7 +103,7 @@ namespace memory_buffer
 			buffer.size_ < buffer.capacity_;
 
 		auto elements_available = (buffer.capacity_ - buffer.size_) >= n_elements;
-		assert(elements_available);
+		assert(elements_available && " *** buffer full *** ");
 
 		if (!is_valid || !elements_available)
 		{
@@ -126,9 +126,9 @@ namespace memory_buffer
 			return;
 		}
 
-		assert(buffer.data_);
-		assert(buffer.capacity_);
-		assert(n_elements <= buffer.size_);
+		assert(buffer.data_ && " *** no memory *** ");
+		assert(buffer.capacity_ && " *** no capacity *** ");
+		assert(n_elements <= buffer.size_ && " *** too many elements *** ");
 
 		if(n_elements > buffer.size_)
 		{

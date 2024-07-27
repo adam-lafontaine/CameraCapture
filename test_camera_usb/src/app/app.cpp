@@ -140,6 +140,10 @@ namespace app
         {
             img::fill(state.screen, img::to_pixel(0, 255, 0));
         }
+        else if (input.keyboard.kbd_3.pressed)
+        {
+            cam::grab_image(get_camera(state), state.screen);
+        }
     }
 
 

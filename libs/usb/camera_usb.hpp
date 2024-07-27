@@ -75,5 +75,7 @@ namespace camera_usb
 
     bool open_camera(Camera& camera);
 
+    void grab_image(Camera& camera, img::ImageView const& dst);
+
     void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition);
 }
