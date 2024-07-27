@@ -516,7 +516,9 @@ namespace camera_usb
             camera.vendor = span::to_string_view(device.vendor_id);
             camera.product = span::to_string_view(device.product_id);
             camera.serial_number = span::to_string_view(device.serial_number);
-            camera.label = span::to_string_view(device.label);            
+            camera.label = span::to_string_view(device.label);
+
+            camera.format = span::to_string_view("XXXX");
         }
 
         cameras.status = ConnectionStatus::Connected;
@@ -536,22 +538,7 @@ namespace camera_usb
             camera.status = CameraStatus::Inactive;
         }
     }
-
-
-    void close_camera(Camera& camera)
-    {
-        camera.busy = 1;
-
-        auto& device = uvc_list.devices[camera.id];
-        //stop_device_stream(device); // hangs
-
-        //camera.status = CameraStatus::Active;
-        camera.busy = 0;
-
-        // only one at a time
-        mb::reset_buffer(uvc_list.rgba_data);
-    }
-    
+  
     
     bool open_camera(Camera& camera)
     {
@@ -575,7 +562,7 @@ namespace camera_usb
             camera.busy = 0;
             return false;
         }
-        
+
         // only one at a time
         mb::reset_buffer(uvc_list.rgba_data);
 
@@ -610,6 +597,10 @@ namespace camera_usb
     {
         auto& device = uvc_list.devices[camera.id];
 
+        auto status = camera.status;
+
+        camera.status = CameraStatus::Streaming;
+
         while (stream_condition())
         {
             if (grab_and_convert_frame_rgba(device))
@@ -617,6 +608,8 @@ namespace camera_usb
                 on_grab(device.rgba);
             }
         }
+
+        camera.status = status;
     }
 }
 

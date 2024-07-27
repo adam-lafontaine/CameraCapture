@@ -81,9 +81,6 @@ namespace camera_usb
 
     void close(CameraList& cameras);
 
-
-    void close_camera(Camera& camera);
-
     bool open_camera(Camera& camera);
 
     void grab_image(Camera& camera, img::ImageView const& dst);

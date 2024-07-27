@@ -443,12 +443,8 @@ static void main_loop()
         auto& input = user_input[input_id_curr];
         
         idsp::update(input, io_state);
-
-        //camera_sw.start();
-        //gs::update(input);
-        //ui_state.app_frame_ns = camera_sw.get_time_nano();
-
         render_input_display(io_state.display);
+
         render_camera(camera_state.display);
 
         render_imgui_frame();        

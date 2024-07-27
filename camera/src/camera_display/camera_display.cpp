@@ -40,101 +40,19 @@ namespace camera_display
         default: return "UNKN";
         }
     }
-}
-
-
-namespace camera_display
-{
-    static void open_camera(CameraState& state, cam::Camera& camera)
-    {
-        if (!cam::open_camera(camera))
-        {
-            return;
-        }
-
-        auto const is_on = [&](){ return state.is_streaming; };
-
-        auto const on_grab = [&](img::ImageView const& frame){ img::copy(frame, state.display); };
-
-        state.is_streaming = true;
-
-        cam::stream_camera(camera, on_grab, is_on);
-    }
-
-
-    static void open_camera_async(CameraState& state, cam::Camera& camera)
-    {
-        if (camera.busy)
-        {
-            return;
-        }
-
-        std::thread th([&](){ open_camera(state, camera); });
-
-        th.detach();
-    }
-
-
-    static void close_camera_async(CameraState& state, cam::Camera& camera)
-    {
-        if (camera.busy)
-        {
-            return;
-        }
-
-        std::thread th([&]()
-        { 
-            state.is_streaming = false;
-            cam::close_camera(camera); 
-        });
-
-        th.detach();
-    }
-    
-    
-    static void toggle_activate_async(CameraState& state, cam::Camera& camera)
-    {
-        b8 busy = 0;
-
-        using S = cam::CameraStatus;
-
-        switch (camera.status)
-        {
-        case S::Inactive:
-            
-            break;
-        
-        case S::Active:
-            open_camera_async(state, camera);
-            busy = 1;
-            break;
-
-        default:
-            close_camera_async(state, camera);
-            busy = 0;
-            break;
-        }
-
-        for (u32 i = 0; i < state.cameras.count; i++)
-        {
-            auto& c = state.cameras.list[i];
-            if (c.id != camera.id)
-            {
-                c.busy = busy;
-            }
-        }
-    }
 
 
     class CameraCommand
     {
     public:
-        b8 toggle = 0;
-        b8 acquire = 0;
+        b8 toggle_stream = 0;
+        b8 grab = 0;
         int camera_id = -1;
     };
 }
 
+
+/* ui */
 
 namespace camera_display
 {
@@ -148,7 +66,7 @@ namespace camera_display
     {
         enum class columns : int
         {
-            radio = 0,
+            camera = 0,
             width,
             height,
             fps,
@@ -156,15 +74,14 @@ namespace camera_display
             vendor,
             product,
             serial,
-            activate,
             status,
+            grab,
+            stream,            
             count
         };
 
         int table_flags = ImGuiTableFlags_BordersInnerV;
         auto table_dims = ImVec2(0.0f, 0.0f);
-
-        static int camera_id = 0;
 
         //ImU32 cell_bg_color = ImGui::GetColorU32(im_gray(0.1f));
 
@@ -178,15 +95,17 @@ namespace camera_display
             ImGui::TableSetupColumn("Vendor", ImGuiTableColumnFlags_WidthFixed, 50.0f);
             ImGui::TableSetupColumn("Product", ImGuiTableColumnFlags_WidthFixed, 50.0f);
             ImGui::TableSetupColumn("SN", ImGuiTableColumnFlags_WidthFixed, 50.0f);
-            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 80.0f);
             ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 50.0f);
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 80.0f); // grab
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 80.0f); // stream
+            
             ImGui::TableHeadersRow();
         };
 
         auto const table_row = [&](cam::Camera& camera)
         {
-            ImGui::TableSetColumnIndex((int)columns::radio);
-            ImGui::RadioButton(camera.label.begin, &camera_id, camera.id);
+            ImGui::TableSetColumnIndex((int)columns::camera);
+            ImGui::Text("%s", camera.label.begin);
 
             ImGui::TableSetColumnIndex((int)columns::width);
             ImGui::Text("%u", camera.frame_width);
@@ -212,13 +131,24 @@ namespace camera_display
             ImGui::TableSetColumnIndex((int)columns::status);
             ImGui::Text("%s", decode_status(camera.status));
 
-            ImGui::TableSetColumnIndex((int)columns::activate);
+            ImGui::TableSetColumnIndex((int)columns::grab);
             if (!camera.busy)
             {
-                auto label = camera.status == cam::CameraStatus::Active ? "Turn On" : "Turn Off";
+                if (ImGui::Button("Grab"))
+                {
+                    cmd.grab = 1;
+                    cmd.camera_id = camera.id;
+                }
+            }
+
+            ImGui::TableSetColumnIndex((int)columns::stream);
+            auto is_streaming = camera.status == cam::CameraStatus::Streaming;
+            if (!camera.busy || is_streaming)
+            {
+                auto label = is_streaming ? "Turn Off" : "Turn On";
                 if (ImGui::Button(label))
                 {
-                    cmd.toggle = 1;
+                    cmd.toggle_stream = 1;
                     cmd.camera_id = camera.id;
                 }
             }
@@ -243,20 +173,98 @@ namespace camera_display
 }
 
 
+/* camera controls */
+
+namespace camera_display
+{
+    static void init_cameras(CameraState& state)
+    {
+        state.cameras = camera_usb::enumerate_cameras();
+
+        for (u32 i = 0; i < state.cameras.count; i++)
+        {
+            auto& camera = state.cameras.list[i];
+            open_camera(camera);
+        }
+    }
+
+
+    static void grab_image(CameraState& state, cam::Camera& camera)
+    {
+        cam::grab_image(camera, state.display);
+    }
+
+
+    static void stream_camera(CameraState& state, cam::Camera& camera)
+    {
+        auto const is_on = [&](){ return state.is_streaming; };
+
+        auto const on_grab = [&](img::ImageView const& frame){ img::copy(frame, state.display); };
+
+        state.is_streaming = true;
+
+        cam::stream_camera(camera, on_grab, is_on);
+    }
+
+
+    static void grab_image_async(CameraState& state, cam::Camera& camera)
+    {
+        if (camera.busy)
+        {
+            return;
+        }
+
+        std::thread th([&](){ grab_image(state, camera); });
+
+        th.detach();
+    }
+
+
+    static void stream_camera_async(CameraState& state, cam::Camera& camera)
+    {
+        if (camera.busy)
+        {
+            return;
+        }
+
+        std::thread th([&](){ stream_camera(state, camera); });
+
+        th.detach();
+    }
+    
+    
+    static void toggle_stream_async(CameraState& state, cam::Camera& camera)
+    {
+        b8 busy = 0;
+
+        if (state.is_streaming)
+        {
+            state.is_streaming = false;
+        }
+        else
+        {
+            stream_camera_async(state, camera);
+            busy = 1;
+        }
+
+        for (u32 i = 0; i < state.cameras.count; i++)
+        {
+            auto& c = state.cameras.list[i];
+            c.busy = busy;
+        }
+    }
+}
+
+
 /* api */
 
 namespace camera_display
 {
     void init_async(CameraState& state)
     {
-        /*std::thread th([&]()
-        {
-            state.cameras = camera_usb::enumerate_cameras();
-        });
+        std::thread th([&](){ init_cameras(state); });
 
-        th.detach();*/
-
-        state.cameras = camera_usb::enumerate_cameras();
+        th.detach();
     }
 
 
@@ -273,9 +281,13 @@ namespace camera_display
         
         ImGui::Text("%s", decode_status(state.cameras.status));
 
-        if (cmd.toggle)
+        if (cmd.grab)
         {
-            toggle_activate_async(state, state.cameras.list[cmd.camera_id]);
+            grab_image_async(state, state.cameras.list[cmd.camera_id]);
+        }
+        else if (cmd.toggle_stream)
+        {
+            toggle_stream_async(state, state.cameras.list[cmd.camera_id]);
         }
         
     }
