@@ -149,7 +149,7 @@ namespace camera_usb
     }
 
 
-    static void stop_stream(DeviceUVC& device)
+    static void close_stream(DeviceUVC& device)
     {
         if (device.h_stream)
         {
@@ -233,8 +233,9 @@ namespace camera_usb
 
         //format_desc->bBitsPerPixel;
 
-        config.frame_width = frame_desc->wWidth;
-        config.frame_height = frame_desc->wHeight;
+        // this may break if camera does not support dimensions
+        config.frame_width = num::min(WIDTH_MAX, (u32)frame_desc->wWidth);
+        config.frame_height = num::min(HEIGHT_MAX, (u32)frame_desc->wHeight);
         config.fps = 10'000'000 / frame_desc->dwDefaultFrameInterval;
 
         qsnprintf(config.format_code, 5, "%s", (char*)format_desc->fourccFormat);
@@ -283,24 +284,6 @@ namespace camera_usb
 
         qsnprintf(device.label, 32, "%c", label_ch);
         ++label_ch;
-        /*
-        
-        if (!open_device(device))
-        {
-            assert(false && "Could not open device");
-            return false;
-        }
-
-        if (!read_device_config(device))
-        {
-            assert(false && "Error getting device configuration");
-            close_device(device);
-            return false;
-        }
-
-        close_device(device);
-
-        */
 
         return true;
     }
@@ -369,7 +352,7 @@ namespace camera_usb
         for (int i = 0; i < list.count; ++i)
         {
             auto& device = list.devices[i];
-            stop_stream(device);
+            close_stream(device);
             close_device(device);
             uvc::uvc_unref_device(device.p_device);
             device.p_device = nullptr;
@@ -439,9 +422,9 @@ namespace camera_usb
     }
 
 
-    static void stop_device_stream(DeviceUVC& device)
+    static void close_device_stream(DeviceUVC& device)
     {
-        stop_stream(device);
+        close_stream(device);
 
         if (device.status > DeviceStatus::DeviceOpen)
         {
@@ -505,9 +488,8 @@ namespace camera_usb
         CameraList cameras;
         cameras.status = ConnectionStatus::Connecting;
 
-        u32 max_w = 1280;
-        u32 max_h = 720;
-        uvc_list.rgba_data = img::create_buffer32(max_w * max_h, "uvc rgba");
+        auto n_pixels = WIDTH_MAX * HEIGHT_MAX;
+        uvc_list.rgba_data = img::create_buffer32(n_pixels, "uvc rgba");
         if (!uvc_list.rgba_data.ok)
         {
             cameras.count = 0;
@@ -593,6 +575,9 @@ namespace camera_usb
             camera.busy = 0;
             return false;
         }
+        
+        // only one at a time
+        mb::reset_buffer(uvc_list.rgba_data);
 
         device.rgba = img::make_view(camera.frame_width, camera.frame_height, uvc_list.rgba_data);
 
@@ -616,7 +601,6 @@ namespace camera_usb
         {
             img::fill(dst, img::to_pixel(0, 0, 255));
         }
-
 
         camera.busy = 0;
     }

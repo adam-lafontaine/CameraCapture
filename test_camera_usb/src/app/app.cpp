@@ -46,6 +46,29 @@ namespace app
     }
 
 
+    static inline bool set_camera(AppState const& state, u32 id)
+    {  
+        auto& data = get_data(state);
+        auto& cameras = data.camera_list;
+
+        if (id >= cameras.count)
+        {
+            return false;
+        }
+
+        auto& camera = data.camera_list.list[id];
+
+        if (!camera.is_open() && !cam::open_camera(camera))
+        {
+            return false;
+        }
+
+        data.camera_id = { (int)id };
+
+        return true;
+    }
+
+
     static void destroy_state_data(AppState& state)
     {
         if (!state.data_)
@@ -99,12 +122,12 @@ namespace app
             return result;
         }
 
-        auto& camera = get_camera(state);
-
-        if (!cam::open_camera(camera))
+        if(!set_camera(state, 0))
         {
             return result;
         }
+
+        auto& camera = get_camera(state);
 
         result.screen_dimensions = {
             camera.frame_width,
@@ -134,22 +157,23 @@ namespace app
     {
         if (input.keyboard.kbd_1.pressed)
         {
-            img::fill(state.screen, img::to_pixel(255, 0, 0));
+            if (set_camera(state, 0))
+            {
+                cam::grab_image(get_camera(state), state.screen);
+            }
+            
         }
         else if (input.keyboard.kbd_2.pressed)
         {
-            img::fill(state.screen, img::to_pixel(0, 255, 0));
+            if (set_camera(state, 1))
+            {
+                cam::grab_image(get_camera(state), state.screen);
+            }
         }
         else if (input.keyboard.kbd_3.pressed)
         {
-            cam::grab_image(get_camera(state), state.screen);
+            
         }
-    }
-
-
-    void reset(AppState& state)
-    {
-
     }
 
 

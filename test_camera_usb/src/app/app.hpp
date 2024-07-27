@@ -33,7 +33,5 @@ namespace app
 
     void update(AppState& state, input::Input const& input);
 
-    void reset(AppState& state);
-
     void close(AppState& state);
 }

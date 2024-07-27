@@ -5,6 +5,15 @@
 namespace img = image;
 
 
+/* constants */
+
+namespace camera_usb
+{
+    constexpr u32 WIDTH_MAX = 1280;
+    constexpr u32 HEIGHT_MAX = 720;
+}
+
+
 /* status enum */
 
 namespace camera_usb
@@ -48,6 +57,8 @@ namespace camera_usb
 
         CameraStatus status = CameraStatus::Inactive;
         b8 busy = 0;
+
+        bool is_open() const { return status >= CameraStatus::Open; }
     };
 
 
