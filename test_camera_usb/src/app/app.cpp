@@ -121,8 +121,13 @@ namespace app
         {
             return result;
         }
+        
+        for (i32 i = data.camera_list.count - 1; i >= 0; i--)
+        {
+            set_camera(state, (u32)i);
+        }
 
-        if(!set_camera(state, 0))
+        if(data.camera_id.value < 0)
         {
             return result;
         }
