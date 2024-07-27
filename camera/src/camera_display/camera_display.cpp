@@ -4,6 +4,7 @@
 #include "../../../libs/imgui/imgui.h"
 
 #include <thread>
+#include <array>
 
 
 namespace cam = camera_usb;
@@ -61,6 +62,50 @@ namespace camera_display
         return ImVec4(value, value, value, 1.0f);
     }
 
+    
+    template <size_t LEN>
+    class StrLabel
+    {
+    public:
+        char data[LEN] = { 0 };
+    };
+
+
+    template <size_t N, size_t LEN>
+    static constexpr std::array<StrLabel<LEN>, N> label_array(cstr base)
+    {
+        std::array<StrLabel<LEN>, N> labels;
+        auto len = span::strlen(base);
+
+        for (u32 i = 0; i < N; i++)
+        {
+            char* c = labels[i].data;
+
+            for (u32 b = 0; b < len; b++)
+            {
+                *c = *(base + b);
+                ++c;
+            }
+
+            *c = '#';
+            ++c;
+            *c = '#';
+            ++c;
+
+            for (u32 b = 0; b < len; b++)
+            {
+                *c = *(base + b);
+                ++c;
+            }
+
+            *c = 'A' + i;
+            ++c;
+            *c = 0; // just in case
+        }
+
+        return labels;
+    }
+
 
     static void camera_properties_table(cam::CameraList& cameras, CameraCommand& cmd)
     {
@@ -96,11 +141,15 @@ namespace camera_display
             ImGui::TableSetupColumn("Product", ImGuiTableColumnFlags_WidthFixed, 50.0f);
             ImGui::TableSetupColumn("SN", ImGuiTableColumnFlags_WidthFixed, 50.0f);
             ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 50.0f);
-            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 80.0f); // grab
-            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 80.0f); // stream
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.0f); // grab
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 60.0f); // stream
             
             ImGui::TableHeadersRow();
         };
+
+        constexpr auto grab_btn_labels = label_array<16, 32>("Grab");
+        constexpr auto stream_on_labels = label_array<16, 32>("On");
+        constexpr auto stream_off_labels = label_array<16, 32>("Off");
 
         auto const table_row = [&](cam::Camera& camera)
         {
@@ -134,10 +183,12 @@ namespace camera_display
             ImGui::TableSetColumnIndex((int)columns::grab);
             if (!camera.busy)
             {
-                if (ImGui::Button("Grab"))
+                auto btn_label = (cstr)grab_btn_labels[camera.id].data;
+                if (ImGui::Button(btn_label, ImVec2(50.0f, 0.0f)))
                 {
                     cmd.grab = 1;
                     cmd.camera_id = camera.id;
+                    printf("%d", camera.id);
                 }
             }
 
@@ -145,8 +196,10 @@ namespace camera_display
             auto is_streaming = camera.status == cam::CameraStatus::Streaming;
             if (!camera.busy || is_streaming)
             {
-                auto label = is_streaming ? "Turn Off" : "Turn On";
-                if (ImGui::Button(label))
+                auto label_on = stream_on_labels[camera.id].data;
+                auto label_off = stream_off_labels[camera.id].data;
+                auto btn_label = (cstr)(is_streaming ? label_off : label_on);
+                if (ImGui::Button(btn_label, ImVec2(50.0f, 0.0f)))
                 {
                     cmd.toggle_stream = 1;
                     cmd.camera_id = camera.id;
@@ -203,6 +256,12 @@ namespace camera_display
 
         state.is_streaming = true;
 
+        for (u32 i = 0; i < state.cameras.count; i++)
+        {
+            auto& c = state.cameras.list[i];
+            c.busy = 1;
+        }
+
         cam::stream_camera(camera, on_grab, is_on);
     }
 
@@ -235,22 +294,18 @@ namespace camera_display
     
     static void toggle_stream_async(CameraState& state, cam::Camera& camera)
     {
-        b8 busy = 0;
-
         if (state.is_streaming)
         {
             state.is_streaming = false;
+            for (u32 i = 0; i < state.cameras.count; i++)
+            {
+                auto& c = state.cameras.list[i];
+                c.busy = 0;
+            }
         }
         else
         {
             stream_camera_async(state, camera);
-            busy = 1;
-        }
-
-        for (u32 i = 0; i < state.cameras.count; i++)
-        {
-            auto& c = state.cameras.list[i];
-            c.busy = busy;
         }
     }
 }
