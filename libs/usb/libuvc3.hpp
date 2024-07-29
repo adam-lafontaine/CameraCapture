@@ -366,15 +366,6 @@ namespace uvc
     typedef struct uvc_stream_handle uvc_stream_handle_t;
 
 
-#ifdef _WIN32
-
-    struct timeval {
-        long    tv_sec;         /* seconds */
-        long    tv_usec;        /* and microseconds */
-    };
-#endif
-
-
     /** Representation of the interface that brings data into the UVC device */
     typedef struct uvc_input_terminal
     {
@@ -523,7 +514,7 @@ namespace uvc
     /** A callback function to handle incoming assembled UVC frames
      * @ingroup streaming
      */
-    typedef void(uvc_frame_callback_t)(struct uvc_frame *frame, void *user_ptr);
+    typedef void(uvc_frame_callback_t)(struct uvc_frame *frame, void *user_ptr);// TODO: delete
 
     /** Streaming mode, includes all information needed to select stream
      * @ingroup streaming
@@ -664,12 +655,7 @@ namespace uvc
         uvc_frame_callback_t *cb,
         void *user_ptr,
         uint8_t flags);
-
-    uvc_error_t uvc_start_iso_streaming(
-        uvc_device_handle_t *devh,
-        uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr);
+        
 
     void uvc_stop_streaming(uvc_device_handle_t *devh);
 
@@ -1986,8 +1972,10 @@ namespace uvc
         mutex_t cb_mutex;
 
         uint32_t last_polled_seq;
+
         uvc_frame_callback_t *user_cb;
         void *user_ptr;
+        
         struct libusb_transfer *transfers[LIBUVC_NUM_TRANSFER_BUFS];
         uint8_t *transfer_bufs[LIBUVC_NUM_TRANSFER_BUFS];
         struct uvc_frame frame;
@@ -2059,33 +2047,7 @@ namespace uvc
 
 namespace uvc
 {
-
-#ifdef _MSC_VER
-
-#define DELTA_EPOCH_IN_MICROSECS 116444736000000000Ui64
-
-    // gettimeofday - get time of day for Windows;
-    // A gettimeofday implementation for Microsoft Windows;
-    // Public domain code, author "ponnada";
-    int gettimeofday(struct timeval *tv, struct timezone *tz)
-    {
-        FILETIME ft;
-        unsigned __int64 tmpres = 0;
-        static int tzflag = 0;
-        if (NULL != tv)
-        {
-            GetSystemTimeAsFileTime(&ft);
-            tmpres |= ft.dwHighDateTime;
-            tmpres <<= 32;
-            tmpres |= ft.dwLowDateTime;
-            tmpres /= 10;
-            tmpres -= DELTA_EPOCH_IN_MICROSECS;
-            tv->tv_sec = (long)(tmpres / 1000000UL);
-            tv->tv_usec = (long)(tmpres % 1000000UL);
-        }
-        return 0;
-    }
-#endif // _MSC_VER
+    
     uvc_frame_desc_t *uvc_find_frame_desc_stream(uvc_stream_handle_t *strmh,
                                                  uint16_t format_id, uint16_t frame_id);
     uvc_frame_desc_t *uvc_find_frame_desc(uvc_device_handle_t *devh,
@@ -3057,27 +3019,6 @@ namespace uvc
         return UVC_SUCCESS;
     }
 
-    /** Begin streaming video from the camera into the callback function.
-     * @ingroup streaming
-     *
-     * @deprecated The stream type (bulk vs. isochronous) will be determined by the
-     * type of interface associated with the uvc_stream_ctrl_t parameter, regardless
-     * of whether the caller requests isochronous streaming. Please switch to
-     * uvc_start_streaming().
-     *
-     * @param devh UVC device
-     * @param ctrl Control block, processed using {uvc_probe_stream_ctrl} or
-     *             {uvc_get_stream_ctrl_format_size}
-     * @param cb   User callback function. See {uvc_frame_callback_t} for restrictions.
-     */
-    uvc_error_t uvc_start_iso_streaming(
-        uvc_device_handle_t *devh,
-        uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr)
-    {
-        return uvc_start_streaming(devh, ctrl, cb, user_ptr, 0);
-    }
 
     static uvc_stream_handle_t *_uvc_get_stream_by_interface(uvc_device_handle_t *devh, int interface_idx)
     {
