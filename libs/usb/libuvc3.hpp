@@ -516,13 +516,7 @@ namespace uvc
         /** Handle on the device that produced the image.
          * @warning You must not call any uvc_* functions during a callback. */
         uvc_device_handle_t *source;
-        /** Is the data buffer owned by the library?
-         * If 1, the data buffer can be arbitrarily reallocated by frame conversion
-         * functions.
-         * If 0, the data buffer will not be reallocated or freed by the library.
-         * Set this field to zero if you are supplying the buffer.
-         */
-        uint8_t library_owns_data;
+        
         /** Metadata for this frame if available */
         void *metadata;
         /** Size of metadata buffer */
@@ -3080,7 +3074,6 @@ namespace uvc
         }
         strmh->devh = devh;
         strmh->stream_if = stream_if;
-        strmh->frame.library_owns_data = 1;
 
         ret = uvc_claim_if(strmh->devh, strmh->stream_if->bInterfaceNumber);
         if (ret != UVC_SUCCESS)
@@ -3119,7 +3112,7 @@ namespace uvc
      * @ingroup streaming
      *
      * @param strmh UVC stream
-     * @param cb   User callback function. See {uvc_frame_callback_t} for restrictions.
+     * 
      * @param flags Stream setup flags, currently undefined. Set this to zero. The lower bit
      * is reserved for backward compatibility.
      */
@@ -8739,25 +8732,15 @@ namespace uvc
     /** @internal */
     uvc_error_t uvc_ensure_frame_size(uvc_frame_t *frame, size_t need_bytes)
     {
-        if (frame->library_owns_data)
+        if (!frame->data || frame->data_bytes != need_bytes)
         {
-            if (!frame->data || frame->data_bytes != need_bytes)
-            {
-                frame->data_bytes = need_bytes;
-                frame->data = realloc(frame->data, frame->data_bytes);
-            }
-            if (!frame->data)
-                return UVC_ERROR_NO_MEM;
-
-            return UVC_SUCCESS;
+            frame->data_bytes = need_bytes;
+            frame->data = realloc(frame->data, frame->data_bytes);
         }
-        else
-        {
-            if (!frame->data || frame->data_bytes < need_bytes)
-                return UVC_ERROR_NO_MEM;
+        if (!frame->data)
+            return UVC_ERROR_NO_MEM;
 
-            return UVC_SUCCESS;
-        }
+        return UVC_SUCCESS;
     }
 
     /** @brief Allocate a frame structure
@@ -8774,8 +8757,6 @@ namespace uvc
             return NULL;
 
         memset(frame, 0, sizeof(*frame));
-
-        frame->library_owns_data = 1;
 
         if (data_bytes > 0)
         {
@@ -8799,13 +8780,11 @@ namespace uvc
      */
     void uvc_free_frame(uvc_frame_t *frame)
     {
-        if (frame->library_owns_data)
-        {
-            if (frame->data_bytes > 0)
-                free(frame->data);
-            if (frame->metadata_bytes > 0)
-                free(frame->metadata);
-        }
+        if (frame->data_bytes > 0)
+            free(frame->data);
+
+        if (frame->metadata_bytes > 0)
+            free(frame->metadata);
 
         free(frame);
     }
