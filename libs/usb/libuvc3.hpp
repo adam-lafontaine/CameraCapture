@@ -883,9 +883,6 @@ namespace opt
 #include <errno.h>
 #include <setjmp.h>
 
-// #define _POSIX_C_SOURCE 199309L
-#include <time.h>
-
 #include <chrono>
 
 #ifdef LIBUVC_HAS_JPEG
@@ -1967,8 +1964,7 @@ namespace uvc
         uint32_t last_scr, hold_last_scr;
         size_t got_bytes, hold_bytes;
         uint8_t *outbuf, *holdbuf;
-
-        thread_t cb_thread;
+        
         mutex_t cb_mutex;
 
         uint32_t last_polled_seq;
