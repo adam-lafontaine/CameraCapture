@@ -528,11 +528,7 @@ namespace uvc
         /** Size of metadata buffer */
         size_t metadata_bytes;
     } uvc_frame_t;
-
-    /** A callback function to handle incoming assembled UVC frames
-     * @ingroup streaming
-     */
-    typedef void(uvc_frame_callback_t)(struct uvc_frame *frame, void *user_ptr);// TODO: delete
+    
 
     /** Streaming mode, includes all information needed to select stream
      * @ingroup streaming
@@ -670,8 +666,6 @@ namespace uvc
     uvc_error_t uvc_start_streaming(
         uvc_device_handle_t *devh,
         uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr,
         uint8_t flags);
         
 
@@ -679,10 +673,7 @@ namespace uvc
 
     uvc_error_t uvc_stream_open_ctrl(uvc_device_handle_t *devh, uvc_stream_handle_t **strmh, uvc_stream_ctrl_t *ctrl);
     uvc_error_t uvc_stream_ctrl(uvc_stream_handle_t *strmh, uvc_stream_ctrl_t *ctrl);
-    uvc_error_t uvc_stream_start(uvc_stream_handle_t *strmh,
-                                    uvc_frame_callback_t *cb,
-                                    void *user_ptr,
-                                    uint8_t flags);
+    uvc_error_t uvc_stream_start(uvc_stream_handle_t *strmh, uint8_t flags);
                                     
 
 
@@ -3006,8 +2997,6 @@ namespace uvc
     uvc_error_t uvc_start_streaming(
         uvc_device_handle_t *devh,
         uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr,
         uint8_t flags)
     {
         uvc_error_t ret;
@@ -3017,7 +3006,7 @@ namespace uvc
         if (ret != UVC_SUCCESS)
             return ret;
 
-        ret = uvc_stream_start(strmh, cb, user_ptr, flags);
+        ret = uvc_stream_start(strmh, flags);
         if (ret != UVC_SUCCESS)
         {
             uvc_stream_close(strmh);
@@ -3136,8 +3125,6 @@ namespace uvc
      */
     uvc_error_t uvc_stream_start(
         uvc_stream_handle_t *strmh,
-        uvc_frame_callback_t *cb,
-        void *user_ptr,
         uint8_t flags)
     {
         /* USB interface we'll be using */

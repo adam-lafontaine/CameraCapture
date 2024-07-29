@@ -180,7 +180,7 @@ namespace camera_usb
             assert(false && "Stream not open");
         }
 
-        auto res = uvc::uvc_stream_start(device.h_stream, 0, (void*)12345, 0);
+        auto res = uvc::uvc_stream_start(device.h_stream, 0);
 
         return res == uvc::UVC_SUCCESS;
     }
