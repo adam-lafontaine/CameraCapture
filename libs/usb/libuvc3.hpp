@@ -1972,9 +1972,6 @@ namespace uvc
         mutex_t cb_mutex;
 
         uint32_t last_polled_seq;
-
-        uvc_frame_callback_t *user_cb;
-        void *user_ptr;
         
         struct libusb_transfer *transfers[LIBUVC_NUM_TRANSFER_BUFS];
         uint8_t *transfer_bufs[LIBUVC_NUM_TRANSFER_BUFS];
@@ -2051,9 +2048,8 @@ namespace uvc
     uvc_frame_desc_t *uvc_find_frame_desc_stream(uvc_stream_handle_t *strmh,
                                                  uint16_t format_id, uint16_t frame_id);
     uvc_frame_desc_t *uvc_find_frame_desc(uvc_device_handle_t *devh,
-                                          uint16_t format_id, uint16_t frame_id);    
-
-    thread_ret_t _uvc_user_caller(void *arg); 
+                                          uint16_t format_id, uint16_t frame_id);  
+                                          
 
 
     void _uvc_populate_frame(uvc_stream_handle_t *strmh);
@@ -2696,8 +2692,6 @@ namespace uvc
         strmh->capture_time_finished.tv_nsec = (long)chr::duration_cast<chr::nanoseconds>(time).count();
         strmh->capture_time_finished.tv_sec = (long)chr::duration_cast<chr::seconds>(time).count();
 
-        //(void)clock_gettime(CLOCK_MONOTONIC, &strmh->capture_time_finished);
-
         /* swap the buffers */
         tmp_buf = strmh->holdbuf;
         strmh->hold_bytes = strmh->got_bytes;
@@ -3301,17 +3295,7 @@ namespace uvc
                                           (void *)strmh, 5000);
             }
         }
-
-        strmh->user_cb = cb;
-        strmh->user_ptr = user_ptr;
-
-        /* If the user wants it, set up a thread that calls the user's function
-         * with the contents of each frame.
-         */
-        if (cb)
-        {
-            thread_create(strmh->cb_thread, _uvc_user_caller, (void*)strmh);
-        }
+        
 
         for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS;
              transfer_id++)
@@ -3341,45 +3325,6 @@ namespace uvc
         strmh->running = 0;
         UVC_EXIT(ret);
         return ret;
-    }
-    
-
-    /** @internal
-     * @brief User callback runner thread
-     * @note There should be at most one of these per currently streaming device
-     * @param arg Device handle
-     */
-    thread_ret_t _uvc_user_caller(void *arg)
-    {
-        uvc_stream_handle_t *strmh = (uvc_stream_handle_t *)arg;
-
-        uint32_t last_seq = 0;
-
-        do
-        {
-            mutex_lock(strmh->cb_mutex);
-
-            while (strmh->running && last_seq == strmh->hold_seq)
-            {
-                mutex_wait(strmh->cb_mutex);
-            }
-
-            if (!strmh->running)
-            {
-                mutex_unlock(strmh->cb_mutex);
-                break;
-            }
-
-            last_seq = strmh->hold_seq;
-            _uvc_populate_frame(strmh);
-            
-            mutex_unlock(strmh->cb_mutex);
-
-            strmh->user_cb(&strmh->frame, strmh->user_ptr);
-        } while (1);
-
-        //return NULL; // return value ignored
-        return (thread_ret_t)0;
     }
 
 
@@ -3463,9 +3408,6 @@ namespace uvc
     {
         if (!strmh->running)
             return UVC_ERROR_INVALID_PARAM;
-
-        if (strmh->user_cb)
-            return UVC_ERROR_CALLBACK_EXISTS;
             
         mutex_lock(strmh->cb_mutex);
 
@@ -3558,15 +3500,6 @@ namespace uvc
 
         // Kick the user thread awake
         mutex_unlock_broadcast(strmh->cb_mutex);
-
-        /** @todo stop the actual stream, camera side? */
-
-        if (strmh->user_cb)
-        {
-            /* wait for the thread to stop (triggered by
-             * LIBUSB_TRANSFER_CANCELLED transfer) */
-            thread_join(strmh->cb_thread);
-        }
 
         return UVC_SUCCESS;
     }
