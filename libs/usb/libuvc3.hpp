@@ -12,7 +12,6 @@
 
 #include <stdio.h> // FILE
 #include <stdint.h>
-#include <time.h>
 
 
 struct libusb_context;
@@ -607,12 +606,15 @@ namespace uvc
     uvc_error_t uvc_open(
         uvc_device_t *dev,
         uvc_device_handle_t **devh);
+
     void uvc_close(uvc_device_handle_t *devh);
 
     uvc_device_t *uvc_get_device(uvc_device_handle_t *devh);
+
     struct libusb_device_handle *uvc_get_libusb_handle(uvc_device_handle_t *devh);
 
     void uvc_ref_device(uvc_device_t *dev);
+
     void uvc_unref_device(uvc_device_t *dev);
 
     void uvc_set_status_callback(uvc_device_handle_t *devh,
@@ -667,8 +669,7 @@ namespace uvc
 
     uvc_error_t uvc_stream_open_ctrl(uvc_device_handle_t *devh, uvc_stream_handle_t **strmh, uvc_stream_ctrl_t *ctrl);
     uvc_error_t uvc_stream_ctrl(uvc_stream_handle_t *strmh, uvc_stream_ctrl_t *ctrl);
-    uvc_error_t uvc_stream_start(uvc_stream_handle_t *strmh, uint8_t flags);
-                                    
+    uvc_error_t uvc_stream_start(uvc_stream_handle_t *strmh, uint8_t flags);                                   
 
 
     uvc_error_t uvc_stream_get_frame(
@@ -811,11 +812,10 @@ namespace uvc
     void uvc_perror(uvc_error_t err, const char *msg);
     const char *uvc_strerror(uvc_error_t err);
 
-
-    /*
+    
     void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream);
     void uvc_print_stream_ctrl(uvc_stream_ctrl_t *ctrl, FILE *stream);
-    */
+    
 
     uvc_frame_t *uvc_allocate_frame(size_t data_bytes);
     void uvc_free_frame(uvc_frame_t *frame);
