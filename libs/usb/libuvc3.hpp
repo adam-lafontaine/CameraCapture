@@ -12,7 +12,6 @@
 
 #include <stdio.h> // FILE
 #include <stdint.h>
-#include <time.h>
 
 
 struct libusb_context;
@@ -366,15 +365,6 @@ namespace uvc
     typedef struct uvc_stream_handle uvc_stream_handle_t;
 
 
-#ifdef _WIN32
-
-    struct timeval {
-        long    tv_sec;         /* seconds */
-        long    tv_usec;        /* and microseconds */
-    };
-#endif
-
-
     /** Representation of the interface that brings data into the UVC device */
     typedef struct uvc_input_terminal
     {
@@ -481,6 +471,20 @@ namespace uvc
     } uvc_device_descriptor_t;
 
 
+    struct timeval
+    {
+        long tv_sec;
+        long tv_usec;
+    };
+
+
+    struct timespec
+    {
+        long tv_sec;
+        long tv_nsec;
+    };
+
+
     /** An image frame received from the UVC device
      * @ingroup streaming
      */
@@ -500,30 +504,24 @@ namespace uvc
         size_t step;
         /** Frame number (may skip, but is strictly monotonically increasing) */
         uint32_t sequence;
+
         /** Estimate of system time when the device started capturing the image */
-        struct timeval capture_time;
+        timeval capture_time;
+
+
         /** Estimate of system time when the device finished receiving the image */
-        struct timespec capture_time_finished;
+        timespec capture_time_finished;
+
         /** Handle on the device that produced the image.
          * @warning You must not call any uvc_* functions during a callback. */
         uvc_device_handle_t *source;
-        /** Is the data buffer owned by the library?
-         * If 1, the data buffer can be arbitrarily reallocated by frame conversion
-         * functions.
-         * If 0, the data buffer will not be reallocated or freed by the library.
-         * Set this field to zero if you are supplying the buffer.
-         */
-        uint8_t library_owns_data;
+        
         /** Metadata for this frame if available */
         void *metadata;
         /** Size of metadata buffer */
         size_t metadata_bytes;
     } uvc_frame_t;
-
-    /** A callback function to handle incoming assembled UVC frames
-     * @ingroup streaming
-     */
-    typedef void(uvc_frame_callback_t)(struct uvc_frame *frame, void *user_ptr);
+    
 
     /** Streaming mode, includes all information needed to select stream
      * @ingroup streaming
@@ -608,12 +606,15 @@ namespace uvc
     uvc_error_t uvc_open(
         uvc_device_t *dev,
         uvc_device_handle_t **devh);
+
     void uvc_close(uvc_device_handle_t *devh);
 
     uvc_device_t *uvc_get_device(uvc_device_handle_t *devh);
+
     struct libusb_device_handle *uvc_get_libusb_handle(uvc_device_handle_t *devh);
 
     void uvc_ref_device(uvc_device_t *dev);
+
     void uvc_unref_device(uvc_device_t *dev);
 
     void uvc_set_status_callback(uvc_device_handle_t *devh,
@@ -661,25 +662,14 @@ namespace uvc
     uvc_error_t uvc_start_streaming(
         uvc_device_handle_t *devh,
         uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr,
         uint8_t flags);
-
-    uvc_error_t uvc_start_iso_streaming(
-        uvc_device_handle_t *devh,
-        uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr);
+        
 
     void uvc_stop_streaming(uvc_device_handle_t *devh);
 
     uvc_error_t uvc_stream_open_ctrl(uvc_device_handle_t *devh, uvc_stream_handle_t **strmh, uvc_stream_ctrl_t *ctrl);
     uvc_error_t uvc_stream_ctrl(uvc_stream_handle_t *strmh, uvc_stream_ctrl_t *ctrl);
-    uvc_error_t uvc_stream_start(uvc_stream_handle_t *strmh,
-                                    uvc_frame_callback_t *cb,
-                                    void *user_ptr,
-                                    uint8_t flags);
-                                    
+    uvc_error_t uvc_stream_start(uvc_stream_handle_t *strmh, uint8_t flags);                                   
 
 
     uvc_error_t uvc_stream_get_frame(
@@ -822,11 +812,10 @@ namespace uvc
     void uvc_perror(uvc_error_t err, const char *msg);
     const char *uvc_strerror(uvc_error_t err);
 
-
-    /*
+    
     void uvc_print_diag(uvc_device_handle_t *devh, FILE *stream);
     void uvc_print_stream_ctrl(uvc_stream_ctrl_t *ctrl, FILE *stream);
-    */
+    
 
     uvc_frame_t *uvc_allocate_frame(size_t data_bytes);
     void uvc_free_frame(uvc_frame_t *frame);
@@ -896,9 +885,6 @@ namespace opt
 
 #include <errno.h>
 #include <setjmp.h>
-
-// #define _POSIX_C_SOURCE 199309L
-#include <time.h>
 
 #include <chrono>
 
@@ -1981,13 +1967,11 @@ namespace uvc
         uint32_t last_scr, hold_last_scr;
         size_t got_bytes, hold_bytes;
         uint8_t *outbuf, *holdbuf;
-
-        thread_t cb_thread;
+        
         mutex_t cb_mutex;
 
         uint32_t last_polled_seq;
-        uvc_frame_callback_t *user_cb;
-        void *user_ptr;
+        
         struct libusb_transfer *transfers[LIBUVC_NUM_TRANSFER_BUFS];
         uint8_t *transfer_bufs[LIBUVC_NUM_TRANSFER_BUFS];
         struct uvc_frame frame;
@@ -2059,39 +2043,12 @@ namespace uvc
 
 namespace uvc
 {
-
-#ifdef _MSC_VER
-
-#define DELTA_EPOCH_IN_MICROSECS 116444736000000000Ui64
-
-    // gettimeofday - get time of day for Windows;
-    // A gettimeofday implementation for Microsoft Windows;
-    // Public domain code, author "ponnada";
-    int gettimeofday(struct timeval *tv, struct timezone *tz)
-    {
-        FILETIME ft;
-        unsigned __int64 tmpres = 0;
-        static int tzflag = 0;
-        if (NULL != tv)
-        {
-            GetSystemTimeAsFileTime(&ft);
-            tmpres |= ft.dwHighDateTime;
-            tmpres <<= 32;
-            tmpres |= ft.dwLowDateTime;
-            tmpres /= 10;
-            tmpres -= DELTA_EPOCH_IN_MICROSECS;
-            tv->tv_sec = (long)(tmpres / 1000000UL);
-            tv->tv_usec = (long)(tmpres % 1000000UL);
-        }
-        return 0;
-    }
-#endif // _MSC_VER
+    
     uvc_frame_desc_t *uvc_find_frame_desc_stream(uvc_stream_handle_t *strmh,
                                                  uint16_t format_id, uint16_t frame_id);
     uvc_frame_desc_t *uvc_find_frame_desc(uvc_device_handle_t *devh,
-                                          uint16_t format_id, uint16_t frame_id);    
-
-    thread_ret_t _uvc_user_caller(void *arg); 
+                                          uint16_t format_id, uint16_t frame_id);  
+                                          
 
 
     void _uvc_populate_frame(uvc_stream_handle_t *strmh);
@@ -2734,8 +2691,6 @@ namespace uvc
         strmh->capture_time_finished.tv_nsec = (long)chr::duration_cast<chr::nanoseconds>(time).count();
         strmh->capture_time_finished.tv_sec = (long)chr::duration_cast<chr::seconds>(time).count();
 
-        //(void)clock_gettime(CLOCK_MONOTONIC, &strmh->capture_time_finished);
-
         /* swap the buffers */
         tmp_buf = strmh->holdbuf;
         strmh->hold_bytes = strmh->got_bytes;
@@ -3036,8 +2991,6 @@ namespace uvc
     uvc_error_t uvc_start_streaming(
         uvc_device_handle_t *devh,
         uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr,
         uint8_t flags)
     {
         uvc_error_t ret;
@@ -3047,7 +3000,7 @@ namespace uvc
         if (ret != UVC_SUCCESS)
             return ret;
 
-        ret = uvc_stream_start(strmh, cb, user_ptr, flags);
+        ret = uvc_stream_start(strmh, flags);
         if (ret != UVC_SUCCESS)
         {
             uvc_stream_close(strmh);
@@ -3057,27 +3010,6 @@ namespace uvc
         return UVC_SUCCESS;
     }
 
-    /** Begin streaming video from the camera into the callback function.
-     * @ingroup streaming
-     *
-     * @deprecated The stream type (bulk vs. isochronous) will be determined by the
-     * type of interface associated with the uvc_stream_ctrl_t parameter, regardless
-     * of whether the caller requests isochronous streaming. Please switch to
-     * uvc_start_streaming().
-     *
-     * @param devh UVC device
-     * @param ctrl Control block, processed using {uvc_probe_stream_ctrl} or
-     *             {uvc_get_stream_ctrl_format_size}
-     * @param cb   User callback function. See {uvc_frame_callback_t} for restrictions.
-     */
-    uvc_error_t uvc_start_iso_streaming(
-        uvc_device_handle_t *devh,
-        uvc_stream_ctrl_t *ctrl,
-        uvc_frame_callback_t *cb,
-        void *user_ptr)
-    {
-        return uvc_start_streaming(devh, ctrl, cb, user_ptr, 0);
-    }
 
     static uvc_stream_handle_t *_uvc_get_stream_by_interface(uvc_device_handle_t *devh, int interface_idx)
     {
@@ -3142,7 +3074,6 @@ namespace uvc
         }
         strmh->devh = devh;
         strmh->stream_if = stream_if;
-        strmh->frame.library_owns_data = 1;
 
         ret = uvc_claim_if(strmh->devh, strmh->stream_if->bInterfaceNumber);
         if (ret != UVC_SUCCESS)
@@ -3181,14 +3112,12 @@ namespace uvc
      * @ingroup streaming
      *
      * @param strmh UVC stream
-     * @param cb   User callback function. See {uvc_frame_callback_t} for restrictions.
+     * 
      * @param flags Stream setup flags, currently undefined. Set this to zero. The lower bit
      * is reserved for backward compatibility.
      */
     uvc_error_t uvc_stream_start(
         uvc_stream_handle_t *strmh,
-        uvc_frame_callback_t *cb,
-        void *user_ptr,
         uint8_t flags)
     {
         /* USB interface we'll be using */
@@ -3360,17 +3289,7 @@ namespace uvc
                                           (void *)strmh, 5000);
             }
         }
-
-        strmh->user_cb = cb;
-        strmh->user_ptr = user_ptr;
-
-        /* If the user wants it, set up a thread that calls the user's function
-         * with the contents of each frame.
-         */
-        if (cb)
-        {
-            thread_create(strmh->cb_thread, _uvc_user_caller, (void*)strmh);
-        }
+        
 
         for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS;
              transfer_id++)
@@ -3400,45 +3319,6 @@ namespace uvc
         strmh->running = 0;
         UVC_EXIT(ret);
         return ret;
-    }
-    
-
-    /** @internal
-     * @brief User callback runner thread
-     * @note There should be at most one of these per currently streaming device
-     * @param arg Device handle
-     */
-    thread_ret_t _uvc_user_caller(void *arg)
-    {
-        uvc_stream_handle_t *strmh = (uvc_stream_handle_t *)arg;
-
-        uint32_t last_seq = 0;
-
-        do
-        {
-            mutex_lock(strmh->cb_mutex);
-
-            while (strmh->running && last_seq == strmh->hold_seq)
-            {
-                mutex_wait(strmh->cb_mutex);
-            }
-
-            if (!strmh->running)
-            {
-                mutex_unlock(strmh->cb_mutex);
-                break;
-            }
-
-            last_seq = strmh->hold_seq;
-            _uvc_populate_frame(strmh);
-            
-            mutex_unlock(strmh->cb_mutex);
-
-            strmh->user_cb(&strmh->frame, strmh->user_ptr);
-        } while (1);
-
-        //return NULL; // return value ignored
-        return (thread_ret_t)0;
     }
 
 
@@ -3522,9 +3402,6 @@ namespace uvc
     {
         if (!strmh->running)
             return UVC_ERROR_INVALID_PARAM;
-
-        if (strmh->user_cb)
-            return UVC_ERROR_CALLBACK_EXISTS;
             
         mutex_lock(strmh->cb_mutex);
 
@@ -3617,15 +3494,6 @@ namespace uvc
 
         // Kick the user thread awake
         mutex_unlock_broadcast(strmh->cb_mutex);
-
-        /** @todo stop the actual stream, camera side? */
-
-        if (strmh->user_cb)
-        {
-            /* wait for the thread to stop (triggered by
-             * LIBUSB_TRANSFER_CANCELLED transfer) */
-            thread_join(strmh->cb_thread);
-        }
 
         return UVC_SUCCESS;
     }
@@ -8864,25 +8732,15 @@ namespace uvc
     /** @internal */
     uvc_error_t uvc_ensure_frame_size(uvc_frame_t *frame, size_t need_bytes)
     {
-        if (frame->library_owns_data)
+        if (!frame->data || frame->data_bytes != need_bytes)
         {
-            if (!frame->data || frame->data_bytes != need_bytes)
-            {
-                frame->data_bytes = need_bytes;
-                frame->data = realloc(frame->data, frame->data_bytes);
-            }
-            if (!frame->data)
-                return UVC_ERROR_NO_MEM;
-
-            return UVC_SUCCESS;
+            frame->data_bytes = need_bytes;
+            frame->data = realloc(frame->data, frame->data_bytes);
         }
-        else
-        {
-            if (!frame->data || frame->data_bytes < need_bytes)
-                return UVC_ERROR_NO_MEM;
+        if (!frame->data)
+            return UVC_ERROR_NO_MEM;
 
-            return UVC_SUCCESS;
-        }
+        return UVC_SUCCESS;
     }
 
     /** @brief Allocate a frame structure
@@ -8899,8 +8757,6 @@ namespace uvc
             return NULL;
 
         memset(frame, 0, sizeof(*frame));
-
-        frame->library_owns_data = 1;
 
         if (data_bytes > 0)
         {
@@ -8924,13 +8780,11 @@ namespace uvc
      */
     void uvc_free_frame(uvc_frame_t *frame)
     {
-        if (frame->library_owns_data)
-        {
-            if (frame->data_bytes > 0)
-                free(frame->data);
-            if (frame->metadata_bytes > 0)
-                free(frame->metadata);
-        }
+        if (frame->data_bytes > 0)
+            free(frame->data);
+
+        if (frame->metadata_bytes > 0)
+            free(frame->metadata);
 
         free(frame);
     }
