@@ -436,6 +436,29 @@ namespace image
 }
 
 
+/* for_each_pixel */
+
+namespace image
+{
+    template <typename T>
+    static inline void for_each_in_span(SpanView<T> const& span, fn<void(T)> const& func)
+    {
+        for (u32 i = 0; i < span.length; i++)
+        {
+            func(span.begin[i]);
+        }
+    }
+
+
+    void for_each_pixel(ImageView const& view, fn<void(Pixel)> const& func)
+    {
+        assert(view.matrix_data_);
+
+        for_each_in_span(to_span(view), func);
+    }
+}
+
+
 /* read write */
 
 namespace image

@@ -245,6 +245,14 @@ namespace image
 }
 
 
+/* for_each_pixel */
+
+namespace image
+{
+    void for_each_pixel(ImageView const& view, fn<void(Pixel)> const& func);
+}
+
+
 /* read write */
 
 namespace image
