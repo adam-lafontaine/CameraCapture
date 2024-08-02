@@ -1,6 +1,7 @@
 #include "input_display.hpp"
 #include "../../../libs/qsprintf/qsprintf.hpp"
 #include "../../../libs/span/span.hpp"
+#include "../../../libs/util/numeric.hpp"
 
 #include <cassert>
 #include <array>
@@ -10,6 +11,7 @@
 
 namespace img = image;
 namespace sp = span;
+namespace num = numeric;
 
 using Image = img::Image;
 using ImageView = img::ImageView;
@@ -91,7 +93,7 @@ namespace input_display
 
     static void render_text(cstr text, img::SubView const& dst)
     {
-        auto const len = std::strlen(text);
+        auto const len = span::strlen(text);
 
         Rect2Du32 d_range = { 0 };
 
@@ -103,8 +105,8 @@ namespace input_display
         {
             auto ch_filter = make_ascii_view(text[i]);
 
-            width = std::min(ch_filter.width, (u32)w_remaining);
-            height = std::min(ch_filter.height, dst.height);
+            width = num::min(ch_filter.width, (u32)w_remaining);
+            height = num::min(ch_filter.height, dst.height);
 
             d_range.x_end += width;
             d_range.y_end = height;
@@ -487,7 +489,7 @@ namespace input_display
         auto const mse_h = raw_mouse.height;
 
         u32 display_width = ctlr_w + kbd_w + mse_w;
-        u32 display_height = std::max({ctlr_h, kbd_h, mse_h});
+        u32 display_height = num::max(num::max(ctlr_h, kbd_h), mse_h);
 
         constexpr u32 mouse_coord_capacity = sizeof("(0000, 0000)");
 
@@ -654,7 +656,7 @@ namespace input_display
 
         sp::zero_string(coords);
         qsnprintf(coords.begin, coords.capacity, "(%d, %d)", mouse_pos.x, mouse_pos.y);
-        coords.length = std::strlen(coords.begin);
+        coords.length = span::strlen(coords.begin);
 
         render_text(sp::to_cstr(coords), state_data.mouse_coords_view);
     }

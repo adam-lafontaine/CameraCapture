@@ -44,107 +44,11 @@ namespace span
 }
 
 
-/* bit_copy simd */
+/* wide_copy */
 
 namespace span
 {
-    static inline void bit_copy_128(u8* src, u8* dst)
-    {
-        #ifdef SPAN_SIMD_128
-        _mm_storeu_si128((i128*)dst, _mm_loadu_si128((i128*)src));
-        #else
-        ((u64*)dst)[0] = ((u64*)src)[0];
-        ((u64*)dst)[1] = ((u64*)src)[1];
-        #endif
-    }
-
-
-    static inline void bit_copy_256(u8* src, u8* dst)
-    {
-        #ifdef SPAN_SIMD_256
-        _mm256_storeu_si256((i256*)dst, _mm256_loadu_si256((i256*)src));
-        #else
-        bit_copy_128(src, dst);
-        bit_copy_128(src + size128, dst + size128);
-        #endif
-    }
-}
-
-
-/* bit_fill simd */
-
-namespace span
-{
-#ifndef SPAN_SIMD_128
-
-    static inline void bit_fill_u8_64(u8* dst, u8 value)
-    {
-        dst[0] = value;
-        dst[1] = value;
-        dst[2] = value;
-        dst[3] = value;
-        dst[4] = value;
-        dst[5] = value;
-        dst[6] = value;
-        dst[7] = value;
-    }
-
-#endif
-
-
-    static inline void bit_fill_u8_128(u8* dst, u8 value)
-    {
-        #ifdef SPAN_SIMD_128
-        _mm_storeu_si128((i128*)dst, _mm_set1_epi8(value));
-        #else
-        bit_fill_u8_64(dst, value);
-        bit_fill_u8_64(dst + size64, value);
-        #endif
-    }
-
-
-    static inline void bit_fill_u8_256(u8* dst, u8 value)
-    {
-        #ifdef SPAN_SIMD_256
-        _mm256_storeu_si256((i256*)dst, _mm256_set1_epi8(value));
-        #else
-        bit_fill_u8_128(dst, value);
-        bit_fill_u8_128(dst + size128, value);
-        #endif
-    }
-
-
-    static inline void bit_fill_i32_128(u8* dst, i32 value)
-    {
-        #ifdef SPAN_SIMD_128
-        _mm_storeu_si128((i128*)dst, _mm_set1_epi32(value));
-        #else
-        ((i32*)dst)[0] = value;
-        ((i32*)dst)[1] = value;
-        ((i32*)dst)[2] = value;
-        ((i32*)dst)[3] = value;
-        #endif
-    }
-
-
-    static inline void bit_fill_i32_256(u8* dst, i32 value)
-    {
-        #ifdef SPAN_SIMD_256
-        _mm256_storeu_si256((i256*)dst, _mm256_set1_epi32(value));
-        #else
-        bit_fill_i32_128(dst, value);
-        bit_fill_i32_128(dst + size128, value);
-        #endif
-    }
-    
-}
-
-
-/* bit_copy_64 */
-
-namespace span
-{
-    static void bit_copy_64(u8* src, u8* dst, u32 n_u8)
+    static void wide_copy_64(u8* src, u8* dst, u32 n_u8)
     {
         switch (n_u8)
         {
@@ -189,59 +93,41 @@ namespace span
             break;
         }
     }
-}
 
 
-/* bit_copy */
-
-namespace span
-{
-    static inline void bit_copy_512(u8* src, u8* dst)
+    static inline void wide_copy_128(u8* src, u8* dst)
     {
-        bit_copy_256(src, dst);
-        bit_copy_256(src + size256, dst + size256);
+        #ifdef SPAN_SIMD_128
+        _mm_storeu_si128((i128*)dst, _mm_loadu_si128((i128*)src));
+        #else
+        ((u64*)dst)[0] = ((u64*)src)[0];
+        ((u64*)dst)[1] = ((u64*)src)[1];
+        #endif
     }
 
 
-    static inline void bit_copy_1024(u8* src, u8* dst)
+    static inline void wide_copy_256(u8* src, u8* dst)
     {
-        bit_copy_512(src, dst);
-        bit_copy_512(src + size512, dst + size512);
-    }
-}
-
-
-/* bit_fill */
-
-namespace span
-{
-
-    static inline void bit_fill_u8_512(u8* dst, u8 value)
-    {
-        bit_fill_u8_256(dst, value);
-        bit_fill_u8_256(dst + size256, value);
+        #ifdef SPAN_SIMD_256
+        _mm256_storeu_si256((i256*)dst, _mm256_loadu_si256((i256*)src));
+        #else
+        wide_copy_128(src, dst);
+        wide_copy_128(src + size128, dst + size128);
+        #endif
     }
 
 
-    static inline void bit_fill_u8_1024(u8* dst, u8 value)
+    static inline void wide_copy_512(u8* src, u8* dst)
     {
-        bit_fill_u8_512(dst, value);
-        bit_fill_u8_512(dst + size512, value);
+        wide_copy_256(src, dst);
+        wide_copy_256(src + size256, dst + size256);
     }
 
 
-    static inline void bit_fill_i32_512(u8* dst, i32 value)
+    static inline void wide_copy_1024(u8* src, u8* dst)
     {
-        
-        bit_fill_i32_256(dst, value);
-        bit_fill_i32_256(dst + size256, value);
-    }
-
-
-    static inline void bit_fill_i32_1024(u8* dst, u32 value)
-    {
-        bit_fill_i32_512(dst, value);
-        bit_fill_i32_512(dst + size512, value);
+        wide_copy_512(src, dst);
+        wide_copy_512(src + size512, dst + size512);
     }
 }
 
@@ -266,7 +152,7 @@ namespace span
         auto const src8 = (u8*)(src64 + len64);
         auto const dst8 = (u8*)(dst64 + len64);
 
-        bit_copy_64(src8, dst8, len8);
+        wide_copy_64(src8, dst8, len8);
     }
 
 
@@ -279,11 +165,11 @@ namespace span
 
         for (; i < end128; i += size128)
         {
-            bit_copy_128(src + i, dst + i);
+            wide_copy_128(src + i, dst + i);
         }
 
         i = len_u8 - size128;
-        bit_copy_128(src + i, dst + i);
+        wide_copy_128(src + i, dst + i);
     }
 
 
@@ -296,11 +182,11 @@ namespace span
 
         for (; i < end256; i += size256)
         {            
-            bit_copy_256(src + i, dst + i);
+            wide_copy_256(src + i, dst + i);
         }
 
         i = len_u8 - size256;
-        bit_copy_256(src + i, dst + i);
+        wide_copy_256(src + i, dst + i);
     }
 
 
@@ -313,11 +199,11 @@ namespace span
 
         for(; i < end512; i += size512)
         {
-            bit_copy_512(src + i, dst + i);
+            wide_copy_512(src + i, dst + i);
         }
 
         i = len_u8 - size512;
-        bit_copy_512(src + i, dst + i);
+        wide_copy_512(src + i, dst + i);
     }
 
 
@@ -330,11 +216,69 @@ namespace span
 
         for(; i < end1024; i += size1024)
         {
-            bit_copy_1024(src + i, dst + i);
+            wide_copy_1024(src + i, dst + i);
         }
 
         i = len_u8 - size1024;
-        bit_copy_1024(src + i, dst + i);
+        wide_copy_1024(src + i, dst + i);
+    }
+}
+
+
+/* wide_fill_u8 */
+
+namespace span
+{
+#ifndef SPAN_SIMD_128
+
+    static inline void wide_fill_u8_64(u8* dst, u8 value)
+    {
+        dst[0] = value;
+        dst[1] = value;
+        dst[2] = value;
+        dst[3] = value;
+        dst[4] = value;
+        dst[5] = value;
+        dst[6] = value;
+        dst[7] = value;
+    }
+
+#endif
+
+
+    static inline void wide_fill_u8_128(u8* dst, u8 value)
+    {
+        #ifdef SPAN_SIMD_128
+        _mm_storeu_si128((i128*)dst, _mm_set1_epi8(value));
+        #else
+        wide_fill_u8_64(dst, value);
+        wide_fill_u8_64(dst + size64, value);
+        #endif
+    }
+
+
+    static inline void wide_fill_u8_256(u8* dst, u8 value)
+    {
+        #ifdef SPAN_SIMD_256
+        _mm256_storeu_si256((i256*)dst, _mm256_set1_epi8(value));
+        #else
+        wide_fill_u8_128(dst, value);
+        wide_fill_u8_128(dst + size128, value);
+        #endif
+    }
+
+
+    static inline void wide_fill_u8_512(u8* dst, u8 value)
+    {
+        wide_fill_u8_256(dst, value);
+        wide_fill_u8_256(dst + size256, value);
+    }
+
+
+    static inline void wide_fill_u8_1024(u8* dst, u8 value)
+    {
+        wide_fill_u8_512(dst, value);
+        wide_fill_u8_512(dst + size512, value);
     }
 }
 
@@ -361,11 +305,11 @@ namespace span
 
         for (; i < end128; i += size128)
         {
-            bit_fill_u8_128(dst + i, value);
+            wide_fill_u8_128(dst + i, value);
         }
 
         i = len_u8 - size128;
-        bit_fill_u8_128(dst + i, value);
+        wide_fill_u8_128(dst + i, value);
     }    
 
 
@@ -378,11 +322,11 @@ namespace span
 
         for (; i < end256; i += size256)
         {
-            bit_fill_u8_256(dst + i, value);
+            wide_fill_u8_256(dst + i, value);
         }
 
         i = len_u8 - size256;
-        bit_fill_u8_256(dst + i, value);
+        wide_fill_u8_256(dst + i, value);
     }
 
 
@@ -395,11 +339,11 @@ namespace span
 
         for (; i < end512; i += size512)
         {
-            bit_fill_u8_512(dst + i, value);
+            wide_fill_u8_512(dst + i, value);
         }
 
         i = len_u8 - size512;
-        bit_fill_u8_512(dst + i, value);
+        wide_fill_u8_512(dst + i, value);
     }
 
 
@@ -412,11 +356,64 @@ namespace span
 
         for (; i < end1024; i += size1024)
         {
-            bit_fill_u8_1024(dst + i, value);
+            wide_fill_u8_1024(dst + i, value);
         }
 
         i = len_u8 - size1024;
-        bit_fill_u8_1024(dst + i, value);
+        wide_fill_u8_1024(dst + i, value);
+    }
+}
+
+
+/* wide_fill_i32 */
+
+namespace span
+{
+#ifndef SPAN_SIMD_128
+
+    static inline void wide_fill_i32_64(u8* dst, i32 value)
+    {
+        ((i32*)dst)[0] = value;
+        ((i32*)dst)[1] = value;
+        ((i32*)dst)[2] = value;
+        ((i32*)dst)[3] = value;
+    }
+
+#endif
+
+
+    static inline void wide_fill_i32_128(u8* dst, i32 value)
+    {
+        #ifdef SPAN_SIMD_128
+        _mm_storeu_si128((i128*)dst, _mm_set1_epi32(value));
+        #else
+        wide_fill_i32_64(dst, value);
+        #endif
+    }
+
+
+    static inline void wide_fill_i32_256(u8* dst, i32 value)
+    {
+        #ifdef SPAN_SIMD_256
+        _mm256_storeu_si256((i256*)dst, _mm256_set1_epi32(value));
+        #else
+        wide_fill_i32_128(dst, value);
+        wide_fill_i32_128(dst + size128, value);
+        #endif
+    }
+
+
+    static inline void wide_fill_i32_512(u8* dst, i32 value)
+    {        
+        wide_fill_i32_256(dst, value);
+        wide_fill_i32_256(dst + size256, value);
+    }
+
+
+    static inline void wide_fill_i32_1024(u8* dst, u32 value)
+    {
+        wide_fill_i32_512(dst, value);
+        wide_fill_i32_512(dst + size512, value);
     }
 }
 
@@ -448,11 +445,11 @@ namespace span
 
         for (; i < end128; i += size128)
         {
-            bit_fill_i32_128(d8 + i, ival);
+            wide_fill_i32_128(d8 + i, ival);
         }
 
         i = len_u8 - size128;
-        bit_fill_i32_128(d8 + i, ival);
+        wide_fill_i32_128(d8 + i, ival);
     }
 
 
@@ -470,11 +467,11 @@ namespace span
 
         for (; i < end256; i += size256)
         {
-            bit_fill_i32_256(d8 + i, ival);
+            wide_fill_i32_256(d8 + i, ival);
         }
 
         i = len_u8 - size256;
-        bit_fill_i32_256(d8 + i, ival);
+        wide_fill_i32_256(d8 + i, ival);
     }
 
 
@@ -492,11 +489,11 @@ namespace span
 
         for (; i < end512; i += size512)
         {
-            bit_fill_i32_512(d8 + i, ival);
+            wide_fill_i32_512(d8 + i, ival);
         }
 
         i = len_u8 - size512;
-        bit_fill_i32_512(d8 + i, ival);
+        wide_fill_i32_512(d8 + i, ival);
     }
 
 
@@ -514,11 +511,11 @@ namespace span
 
         for (; i < end1024; i += size1024)
         {
-            bit_fill_i32_1024(d8 + i, ival);
+            wide_fill_i32_1024(d8 + i, ival);
         }
 
         i = len_u8 - size1024;
-        bit_fill_i32_1024(d8 + i, ival);
+        wide_fill_i32_1024(d8 + i, ival);
     }
 
 }

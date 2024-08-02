@@ -5,8 +5,6 @@
 #include "../qsprintf/qsprintf.hpp"
 #include "../util/numeric.hpp"
 
-#include <cstring>
-
 namespace mb = memory_buffer;
 namespace sb = stack_buffer;
 namespace num = numeric;
@@ -63,7 +61,7 @@ namespace span
     }
 
 
-    template <typename T, size_t N>
+    template <typename T, u64 N>
     inline SpanView<T> push_span(StackBuffer<T, N>& buffer, u32 length)
     {
         SpanView<T> view{};
@@ -140,6 +138,18 @@ namespace span
         for (; text[len]; len++) {}
 
         return len;
+    }
+
+
+    inline constexpr int strcmp(cstr str_a, cstr str_b)
+    {
+        while (*str_a && (*str_a == *str_b))
+        {
+            str_a++;
+            str_b++;
+        }
+
+        return *(u8*)str_a - *(u8*)str_b;
     }
 
 

@@ -253,3 +253,124 @@ namespace image
 
     bool write_image(Image const& image_src, const char* file_path_dst);
 }
+
+
+/* planar channels */
+
+namespace image
+{
+    template <typename T, u32 C>
+	class ChannelMatrix2D
+	{
+	public:
+		T* channel_data[C] = { 0 };
+
+		u32 width = 0;
+		u32 height = 0;
+	};
+
+
+	template <typename T>
+	using View4 = ChannelMatrix2D<T, 4>;
+
+	template <typename T>
+	using View3 = ChannelMatrix2D<T, 3>;
+
+	template <typename T>
+	using View2 = ChannelMatrix2D<T, 2>;
+
+	template <typename T>
+	using View1 = MatrixView2D<T>;
+
+    using View4u8 = View4<u8>;
+    using View3u8 = View3<u8>;
+    using View2u8 = View2<u8>;
+
+	using View1u8 = GrayView;
+
+    using ViewRGBAu8 = View4u8;
+    using ViewRGBu8 = View3u8;
+
+
+    enum class RGB : int
+	{
+		R = 0, G = 1, B = 2
+	};
+
+
+	enum class RGBA : int
+	{
+		R = 0, G = 1, B = 2, A = 3
+	};
+
+
+    template <typename T, u32 C>
+    class ChannelSubView2D
+    {
+    public:
+        T* channel_data[C] = { 0 };
+        u32 channel_width;
+
+        u32 x_begin;
+        u32 y_begin;
+
+        u32 width;
+        u32 height;
+    };
+
+
+    template <typename T>
+    using SubView4 = ChannelSubView2D<T, 4>;
+
+    template <typename T>
+    using SubView3 = ChannelSubView2D<T, 3>;
+
+    using SubView4u8 = SubView4<u8>;
+    using SubView3u8 = SubView3<u8>;
+
+    using SubViewRGBAu8 = SubView4u8;
+    using SubViewRGBu8 = SubView3u8;
+}
+
+
+/* make_view */
+
+namespace image
+{
+    View3u8 make_view_3(u32 width, u32 height, Buffer8& buffer);
+
+    View4u8 make_view_4(u32 width, u32 height, Buffer8& buffer);
+}
+
+
+/* sub_view */
+
+namespace image
+{
+    template <typename T, u32 C>
+    inline ChannelSubView2D<T, C> sub_view(ChannelMatrix2D<T, C> const& view, Rect2Du32 const& range)
+    {
+        ChannelSubView2D<T, C> sub_view{};
+
+        sub_view.channel_data = view.channel_data;
+        sub_view.channel_width = view.width;
+        sub_view.x_begin = range.x_begin;
+        sub_view.y_begin = range.y_begin;
+        sub_view.width = range.x_end - range.x_begin;
+        sub_view.height = range.y_end - range.y_begin;
+
+        return sub_view;
+    }
+}
+
+
+/* map_rgba */
+
+namespace image
+{
+    void map_rgba(ImageView const& src, View4u8 const& dst);
+
+    void map_rgba(ImageView const& src, SubView4u8 const& dst);
+    
+    void map_rgba(View3u8 const& src, ImageView const& dst);
+}
