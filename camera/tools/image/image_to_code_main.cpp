@@ -23,6 +23,8 @@ namespace
     const auto DST_DIR = ROOT_DIR / "src/res/image";
     const auto RESOURCE_CPP_PATH = DST_DIR / "res.cpp";
 
+    constexpr auto PIXEL_TOTAL_NAME = "res_pixel_total";
+
 
     struct CodeFile
     {
@@ -230,10 +232,31 @@ namespace
     }
 
 
+    static std::string to_constexpr_cpp(u64 value, cstr name)
+    {
+        std::ostringstream oss;
+
+        oss
+        << "// " << name << ".cpp\n"
+
+        << "static constexpr unsigned long " << name << " = " << value << ";\n"
+        ;
+
+        return oss.str();
+    }
+
+
     static bool image_to_code(Image const& image, CodeFile file)
     {
         auto text = to_cpp_text(image, file);
         return write_to_cpp_file(text, file.dst_name);
+    }
+
+
+    static bool mem_total_to_code(u64 total)
+    {
+        auto text = to_constexpr_cpp(total, PIXEL_TOTAL_NAME);
+        return write_to_cpp_file(text, PIXEL_TOTAL_NAME);
     }
 
 
@@ -253,6 +276,8 @@ namespace
             file << "#include \"" << item.dst_name << ".cpp\"\n";
         }
 
+        file << "#include \"" << PIXEL_TOTAL_NAME << ".cpp\"\n";
+
         file.close();
 
         return true;
@@ -263,6 +288,7 @@ namespace
 int main()
 {
     Image image;
+    u64 n_pixels = 0;
 
     for (auto item : input_display_code_files)
     {
@@ -285,7 +311,19 @@ int main()
 
         printf("OK\n");
 
+        n_pixels += image.width * image.height;
         img::destroy_image(image);
+    }
+
+    printf("total memory: ");    
+    if (mem_total_to_code(n_pixels))
+    {
+        printf("OK\n");
+    }
+    else
+    {
+        printf("FAIL\n");
+        return EXIT_FAILURE;
     }
 
     printf("resource file: ");
