@@ -27,35 +27,55 @@ using SubFilter = img::GraySubView;
 
 namespace input_display
 {
-    // TODO: embed
-    #define ROOT "/home/adam/Repos/CameraCapture/camera/assets/"
-    
-    const auto CONTROLLER_IMAGE_PATH = ROOT "controller.png";
-    const auto KEYBOARD_IMAGE_PATH = ROOT "keyboard.png";
-    const auto MOUSE_IMAGE_PATH = ROOT "mouse.png";    
-
-
-    inline bool load_image(cstr file_path, Image& image)
+    template <typename SRC>
+    static ImageView load_embedded_image32(SRC const& src, img::Buffer32& buffer)
     {
-        return img::read_image_from_file(file_path, image);
+        auto dst = img::make_view(src.width, src.height, buffer);
+
+        auto len = src.width * src.height;
+        auto lut = (Pixel*)src.color24_lut;
+
+        for (u32 i = 0; i < len; i++)
+        {
+            auto p = lut[src.color_ids[i]];
+            p.alpha = src.alpha[i];
+
+            dst.matrix_data_[i] = p;
+        }
+
+        return dst;
     }
 
 
-    bool load_controller_image(Image& image)
+    static img::Buffer32 create_pixel_memory()
     {
-        return load_image(CONTROLLER_IMAGE_PATH, image);
+#include "../res/image/res_pixel_total.cpp"
+
+        return img::create_buffer32(res_pixel_total, "input_display pixels");
     }
 
 
-    bool load_keyboard_image(Image& image)
+    static ImageView load_controller_view(img::Buffer32& buffer)
     {
-        return load_image(KEYBOARD_IMAGE_PATH, image);
+#include "../res/image/controller.cpp"
+
+        return load_embedded_image32(controller, buffer);
     }
 
 
-    bool load_mouse_image(Image& image)
+    static ImageView load_keyboard_view(img::Buffer32& buffer)
     {
-        return load_image(MOUSE_IMAGE_PATH, image);
+#include "../res/image/keyboard.cpp"
+
+        return load_embedded_image32(keyboard, buffer);
+    }
+
+
+    static ImageView load_mouse_view(img::Buffer32& buffer)
+    {
+#include "../res/image/mouse.cpp"
+
+        return load_embedded_image32(mouse, buffer);
     }
 }
 
@@ -406,43 +426,34 @@ namespace input_display
 
 namespace input_display
 {
-    static void init_controller_filter(ControllerFilter& filter, Image const& raw_controller, Buffer8& buffer)
+    static void init_controller_filter(ControllerFilter& filter, ImageView const& src, Buffer8& buffer)
     {
-        auto const width = raw_controller.width;
-        auto const height = raw_controller.height;
-
         auto& view = filter.filter;
-        view = img::make_view(width, height, buffer);
+        view = img::make_view(src.width, src.height, buffer);
         
-        img::transform(img::make_view(raw_controller), view, to_filter_color_id);
+        img::transform(src, view, to_filter_color_id);
 
         make_controller_filter(filter);
     }
 
 
-    static void init_keyboard_filter(KeyboardFilter& filter, Image const& raw_keyboard, Buffer8& buffer)
+    static void init_keyboard_filter(KeyboardFilter& filter, ImageView const& src, Buffer8& buffer)
     {
-        auto const width = raw_keyboard.width;
-        auto const height = raw_keyboard.height;
-
         auto& view = filter.filter;
-        view = img::make_view(width, height, buffer);
+        view = img::make_view(src.width, src.height, buffer);
         
-        img::transform(img::make_view(raw_keyboard), view, to_filter_color_id);
+        img::transform(src, view, to_filter_color_id);
 
         make_keyboard_filter(filter);
     }
 
 
-    static void init_mouse_filter(MouseFilter& filter, Image const& raw_mouse, Buffer8& buffer)
+    static void init_mouse_filter(MouseFilter& filter, ImageView const& src, Buffer8& buffer)
     {
-        auto const width = raw_mouse.width;
-        auto const height = raw_mouse.height;
-
         auto& view = filter.filter;
-        view = img::make_view(width, height, buffer);
-
-        img::transform(img::make_view(raw_mouse), view, to_filter_color_id);
+        view = img::make_view(src.width, src.height, buffer);
+        
+        img::transform(src, view, to_filter_color_id);
 
         make_mouse_filter(filter);        
     }
@@ -450,44 +461,22 @@ namespace input_display
 
     static bool init_display_view(IOState& state)
     {
-        Image raw_controller;
-        Image raw_keyboard;
-        Image raw_mouse;        
+        auto buffer = create_pixel_memory();
 
-        auto const cleanup = [&]()
-        {
-            img::destroy_image(raw_controller);
-            img::destroy_image(raw_keyboard);
-            img::destroy_image(raw_mouse);            
-        };
-        
-        if (!load_controller_image(raw_controller))
-        {
-            printf("Error: load_controller_image()\n");
-            return false;
-        }
+        auto controller_v = load_controller_view(buffer);
+        auto keyboard_v = load_keyboard_view(buffer);
+        auto mouse_v = load_mouse_view(buffer);
 
-        auto const ctlr_w = raw_controller.width;
-        auto const ctlr_h = raw_controller.height;
+        auto const ctlr_w = controller_v.width;
+        auto const ctlr_h = controller_v.height;
 
-        if (!load_keyboard_image(raw_keyboard))
-        {
-            printf("Error: load_keyboard_image()\n");
-            return false;
-        }
+        auto const kbd_w = keyboard_v.width;
+        auto const kbd_h = keyboard_v.height;
 
-        auto const kbd_w = raw_keyboard.width;
-        auto const kbd_h = raw_keyboard.height;
+        auto const mse_w = mouse_v.width;
+        auto const mse_h = mouse_v.height;
 
-        if (!load_mouse_image(raw_mouse))
-        {
-            printf("Error: load_mouse_image()\n");
-            return false;
-        }
-
-        auto const mse_w = raw_mouse.width;
-        auto const mse_h = raw_mouse.height;
-
+        // images side by side
         u32 display_width = ctlr_w + kbd_w + mse_w;
         u32 display_height = num::max(num::max(ctlr_h, kbd_h), mse_h);
 
@@ -502,17 +491,17 @@ namespace input_display
 
         state.display = img::make_view(display_width, display_height, buffer32);
 
-        auto controller = img::make_rect(0, 0, ctlr_w, ctlr_h);
-        state_data.controller_view = img::sub_view(state.display, controller);
-        init_controller_filter(state_data.controller_filter, raw_controller, buffer8);
+        auto controller_r = img::make_rect(0, 0, ctlr_w, ctlr_h);
+        state_data.controller_view = img::sub_view(state.display, controller_r);
+        init_controller_filter(state_data.controller_filter, controller_v, buffer8);
 
-        auto keyboard = img::make_rect(controller.x_end, 0, kbd_w, kbd_h);
-        state_data.keyboard_view = img::sub_view(state.display, keyboard);
-        init_keyboard_filter(state_data.keyboard_filter, raw_keyboard, buffer8);
+        auto keyboard_r = img::make_rect(controller_r.x_end, 0, kbd_w, kbd_h);
+        state_data.keyboard_view = img::sub_view(state.display, keyboard_r);
+        init_keyboard_filter(state_data.keyboard_filter, keyboard_v, buffer8);
 
-        auto mouse = img::make_rect(keyboard.x_end, 0, mse_w, mse_h);
-        state_data.mouse_view = img::sub_view(state.display, mouse);
-        init_mouse_filter(state_data.mouse_filter, raw_mouse, buffer8);        
+        auto mouse_r = img::make_rect(keyboard_r.x_end, 0, mse_w, mse_h);
+        state_data.mouse_view = img::sub_view(state.display, mouse_r);
+        init_mouse_filter(state_data.mouse_filter, mouse_v, buffer8);        
 
         state_data.mouse_coords = sp::make_view(mouse_coord_capacity, buffer8);
 
@@ -521,9 +510,9 @@ namespace input_display
         auto const coord_width = mse_w * 3 / 4;
         auto const coords = img::make_rect(coord_x, coord_y, coord_width, TEXT_HEIGHT);
 
-        state_data.mouse_coords_view = img::sub_view(state_data.mouse_view, coords);                
+        state_data.mouse_coords_view = img::sub_view(state_data.mouse_view, coords);
 
-        cleanup();
+        mb::destroy_buffer(buffer);
 
         return true;
     }
