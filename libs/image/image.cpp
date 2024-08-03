@@ -6,6 +6,8 @@
 #include "../stb_image/stb_image_resize2.h"
 #include "../stb_image/stb_image_write.h"
 
+#include <cassert>
+
 
 namespace sp = span;
 namespace num = numeric;
@@ -262,6 +264,91 @@ namespace image
 }
 
 
+/* alpha_blend */
+
+namespace image
+{  
+    static constexpr f32 alpha_scale(u8 alpha)
+    {
+        constexpr auto scale = 1.0f / 255.0f;
+
+        switch (alpha)
+        {
+        case 0: return 0.0f;
+
+        case 255: return 1.0f;
+
+        case 126:
+        case 127:
+        case 128:
+        case 129:
+            return 0.5f;
+
+        default: return alpha * scale;
+        }
+    }
+    
+    
+    static inline void alpha_blend(u8 r, u8 g, u8 b, u8 a, Pixel* dst)
+    {
+        auto alpha = alpha_scale(a);
+        auto i = 1.0f - alpha;
+
+        auto& d = *dst;
+        d.red = num::round_to_unsigned<u8>(num::fmaf(alpha, r, i * d.red));
+        d.green = num::round_to_unsigned<u8>(num::fmaf(alpha, g, i * d.green));
+        d.blue = num::round_to_unsigned<u8>(num::fmaf(alpha, b, i * d.blue));
+    }
+    
+    
+    static inline void alpha_blend(Pixel src, Pixel* dst, f32 alpha)
+    {        
+        auto const i = 1.0f - alpha;
+
+        auto& d = *dst;
+        d.red = num::round_to_unsigned<u8>(num::fmaf(alpha, src.red, i * d.red) /* a * s.red + i * d.red */);
+        d.green = num::round_to_unsigned<u8>(num::fmaf(alpha, src.green, i * d.green) /* a * s.green + i * d.green */);
+        d.blue = num::round_to_unsigned<u8>(num::fmaf(alpha, src.blue, i * d.blue) /* a * s.blue + i * d.blue */);
+    }
+
+
+    static inline void alpha_blend(Pixel* src, Pixel* dst, f32 alpha)
+    {
+        alpha_blend(*src, dst, alpha);
+    }
+
+
+    static void alpha_blend(Pixel s, Pixel* dst)
+    {
+        alpha_blend(s, dst, alpha_scale(s.alpha));
+    }    
+
+
+    static void alpha_blend(Pixel* src, Pixel* dst)
+    {
+        alpha_blend(*src, dst);
+    }
+
+
+    static void alpha_blend_span(SpanView<Pixel> const& src, SpanView<Pixel> const& dst)
+    {
+        for (u32 i = 0; i < dst.length; ++i) // TODO: simd
+        {
+            alpha_blend(src.begin + i, dst.begin + i);
+        }
+    }
+
+
+    static void alpha_blend_span(SpanView<Pixel> const& src, SpanView<Pixel> const& dst, f32 alpha)
+    {
+        for (u32 i = 0; i < dst.length; ++i) // TODO: simd
+        {
+            alpha_blend(src.begin + i, dst.begin + i, alpha);
+        }
+    }
+}
+
+
 /* transform static */
 
 namespace image
@@ -349,16 +436,39 @@ namespace image
 }
 
 
+/* for_each_pixel */
+
+namespace image
+{
+    template <typename T>
+    static inline void for_each_in_span(SpanView<T> const& span, fn<void(T)> const& func)
+    {
+        for (u32 i = 0; i < span.length; i++)
+        {
+            func(span.begin[i]);
+        }
+    }
+
+
+    void for_each_pixel(ImageView const& view, fn<void(Pixel)> const& func)
+    {
+        assert(view.matrix_data_);
+
+        for_each_in_span(to_span(view), func);
+    }
+}
+
+
 /* read write */
 
 namespace image
 {
     static bool has_extension(const char* filename, const char* ext)
     {
-        size_t file_length = std::strlen(filename);
-        size_t ext_length = std::strlen(ext);
+        auto file_length = span::strlen(filename);
+        auto ext_length = span::strlen(ext);
 
-        return !std::strcmp(&filename[file_length - ext_length], ext);
+        return !span::strcmp(&filename[file_length - ext_length], ext);
     }
 
 
@@ -468,4 +578,206 @@ namespace image
 #endif
 	}
 
+}
+
+
+/* make_view */
+
+namespace image
+{
+    template <typename T, u32 C>
+	static inline void make_view_n(ChannelMatrix2D<T, C>& view, u32 width, u32 height, MemoryBuffer<T>& buffer)
+	{
+		view.width = width;
+		view.height = height;
+
+		for (u32 ch = 0; ch < C; ++ch)
+		{
+			view.channel_data[ch] = mb::push_elements(buffer, width * height);
+		}
+	}
+
+
+    View3u8 make_view_3(u32 width, u32 height, Buffer8& buffer)
+    {
+        View3u8 view{};
+
+        make_view_n(view, width, height, buffer);
+
+        return view;
+    }
+
+
+    View4u8 make_view_4(u32 width, u32 height, Buffer8& buffer)
+    {
+        View4u8 view{};
+
+        make_view_n(view, width, height, buffer);
+
+        return view;
+    }
+}
+
+
+/* channel span */
+
+namespace image
+{
+    template <typename T, u32 C>
+    class ChannelSpan
+    {
+    public:
+        u32 length = 0;
+
+        T* channel_data[C] = { 0 };
+    };
+
+
+    template <typename T, u32 C>
+    static ChannelSpan<T, C> to_span(ChannelMatrix2D<T, C> const& view)
+    {
+        ChannelSpan<T, C> span{};
+
+        span.length = view.width * view.height;
+
+        for (u32 i = 0; i < C; i++)
+        {
+            span.channel_data[i] = view.channel_data[i];
+        }
+
+        return span;
+    }
+
+
+    using SpanRGBAu8 = ChannelSpan<u8, 4>;
+    using SpanRGBu8 = ChannelSpan<u8, 3>;
+
+
+    template <typename T, u32 C>
+	static inline ChannelSpan<T, C> row_span(ChannelMatrix2D<T, C> const& view, u32 y)
+	{
+        ChannelSpan<T, C> span{};
+
+        span.length = view.width;
+
+        auto offset = (u64)y * view.width;
+
+        for (u32 i = 0; i < C; i++)
+        {
+            span.channel_data[i] = view.channel_data[i] + offset;
+        }        
+
+        return span;
+	}
+
+
+    template <typename T, u32 C>
+    static inline ChannelSpan<T, C> row_span(ChannelSubView2D<T, C> const& view, u32 y)
+    {
+        ChannelSpan<T, C> span{};
+
+        span.length = view.width;
+
+        auto offset = (u64)(view.y_begin + y) * view.channel_width + view.x_begin;
+
+        for (u32 i = 0; i < C; i++)
+        {
+            span.channel_data[i] = view.channel_data[i] + offset;
+        }        
+
+        return span;
+    }
+}
+
+
+/* map_rgba */
+
+namespace image
+{
+    static void map_span_rgba(SpanView<Pixel> const& src, SpanRGBAu8 const& dst)
+    {
+        auto r = dst.channel_data[(int)RGBA::R];
+        auto g = dst.channel_data[(int)RGBA::G];
+        auto b = dst.channel_data[(int)RGBA::B];
+        auto a = dst.channel_data[(int)RGBA::A];
+
+        for (u32 i = 0; i < src.length; i++)
+        {
+            auto p = src.begin[i];
+            r[i] = p.red;
+            g[i] = p.green;
+            b[i] = p.blue;
+            a[i] = p.alpha;
+        }
+    }
+
+
+    static void map_span_rgba(SpanRGBu8 const& src, SpanView<Pixel> const& dst)
+    {
+        auto r = src.channel_data[(int)RGB::R];
+        auto g = src.channel_data[(int)RGB::G];
+        auto b = src.channel_data[(int)RGB::B];
+
+        for (u32 i = 0; i < src.length; i++)
+        {
+            auto& p = dst.begin[i];
+            p.red = r[i];
+            p.green = g[i];
+            p.blue = b[i];
+            p.alpha = 255;
+        }
+    }
+
+
+    static void map_span_blend(SpanRGBAu8 const& src, SpanView<Pixel> const& dst)
+    {
+        auto r = src.channel_data[(int)RGBA::R];
+        auto g = src.channel_data[(int)RGBA::G];
+        auto b = src.channel_data[(int)RGBA::B];
+        auto a = src.channel_data[(int)RGBA::A];
+
+        for (u32 i = 0; i < src.length; i++)
+        {
+            auto p = dst.begin + i;
+            alpha_blend(r[i], g[i], b[i], a[i], p);
+        }
+    }
+
+
+    void map_rgba(ImageView const& src, View4u8 const& dst)
+    {
+        assert(src.matrix_data_);
+        assert(dst.channel_data[0]);
+        assert(src.width == dst.width);
+        assert(src.height == dst.height);
+
+        map_span_rgba(to_span(src), to_span(dst));
+    }
+
+
+    void map_rgba(ImageView const& src, SubView4u8 const& dst)
+    {
+        assert(src.matrix_data_);
+        assert(dst.channel_data[0]);
+        assert(src.width == dst.width);
+        assert(src.height == dst.height);
+
+        for (u32 y = 0; y < src.height; y++)
+        {
+            map_span_rgba(row_span(src, y), row_span(dst, y));
+        }
+    }
+
+
+    void map_rgba(View3u8 const& src, ImageView const& dst)
+    {
+        assert(dst.matrix_data_);
+        assert(src.channel_data[0]);
+        assert(src.width == dst.width);
+        assert(src.height == dst.height);
+
+        map_span_rgba(to_span(src), to_span(dst));
+    }
+
+    
 }

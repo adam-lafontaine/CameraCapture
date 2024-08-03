@@ -189,6 +189,15 @@ input_display_c := $(input_display)/input_display.cpp
 #***************
 
 
+#*** res ***
+
+res := $(src)/res
+
+res_image_cpp := $(res)/image/res.cpp
+
+#***********
+
+
 #*** diagnostics ***
 
 diagnostics := $(src)/diagnostics
@@ -231,6 +240,7 @@ main_dep += $(diagnostics_h)
 main_dep += $(diagnostics_c)
 main_dep += $(input_display_h)
 main_dep += $(input_display_c)
+main_dep += $(res_image_cpp)
 
 #****************
 
