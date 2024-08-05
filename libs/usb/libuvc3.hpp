@@ -1008,6 +1008,12 @@ namespace uvc
     }
 
 
+    inline void* uvc_realloc_void(void* ptr, u32 n_bytes)
+    {
+        return std::realloc(ptr, n_bytes);
+    }
+
+
     template <typename T>
     inline void uvc_free(T* ptr)
     {
@@ -3408,7 +3414,7 @@ namespace uvc
         /* copy the image data from the hold buffer to the frame (unnecessary extra buf?) */
         if (frame->data_bytes < strmh->hold_bytes)
         {
-            frame->data = std::realloc(frame->data, strmh->hold_bytes);
+            frame->data = uvc_realloc_void(frame->data, strmh->hold_bytes);
         }
         frame->data_bytes = strmh->hold_bytes;
         memcpy(frame->data, strmh->holdbuf, frame->data_bytes);
@@ -3417,7 +3423,7 @@ namespace uvc
         {
             if (frame->metadata_bytes < strmh->meta_hold_bytes)
             {
-                frame->metadata = std::realloc(frame->metadata, strmh->meta_hold_bytes);
+                frame->metadata = uvc_realloc_void(frame->metadata, strmh->meta_hold_bytes);
             }
             frame->metadata_bytes = strmh->meta_hold_bytes;
             memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
@@ -4246,7 +4252,7 @@ namespace uvc
                 uvc_ref_device(test_dev);
 
                 num_uvc_devices++;
-                list_internal = (uvc_device_t **)std::realloc(list_internal, (num_uvc_devices + 1) * sizeof(*list_internal));
+                list_internal = uvc_realloc<uvc_device_t *>(list_internal, num_uvc_devices + 1);
 
                 list_internal[num_uvc_devices - 1] = test_dev;
                 list_internal[num_uvc_devices] = NULL;
@@ -4883,7 +4889,7 @@ namespace uvc
                 uvc_ref_device(uvc_dev);
 
                 num_uvc_devices++;
-                list_internal = (uvc_device_t **)std::realloc(list_internal, (num_uvc_devices + 1) * sizeof(*list_internal));
+                list_internal = uvc_realloc<uvc_device_t *>(list_internal, num_uvc_devices + 1);
 
                 list_internal[num_uvc_devices - 1] = uvc_dev;
                 list_internal[num_uvc_devices] = NULL;
@@ -8768,7 +8774,7 @@ namespace uvc
         if (!frame->data || frame->data_bytes != need_bytes)
         {
             frame->data_bytes = need_bytes;
-            frame->data = std::realloc(frame->data, frame->data_bytes);
+            frame->data = uvc_realloc_void(frame->data, frame->data_bytes);
         }
         if (!frame->data)
             return UVC_ERROR_NO_MEM;
@@ -8853,7 +8859,7 @@ namespace uvc
         {
             if (out->metadata_bytes < in->metadata_bytes)
             {
-                out->metadata = std::realloc(out->metadata, in->metadata_bytes);
+                out->metadata = uvc_realloc_void(out->metadata, in->metadata_bytes);
             }
             out->metadata_bytes = in->metadata_bytes;
             memcpy(out->metadata, in->metadata, in->metadata_bytes);
