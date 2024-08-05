@@ -983,6 +983,33 @@ namespace uvc
 }
 
 
+/* memory */
+#include <cstdlib> // temp
+
+namespace uvc
+{
+    template <typename T>
+    inline T* uvc_malloc(u32 n_elements = 1)
+    {
+        return (T*)std::malloc(n_elements * sizeof(T));
+    }
+
+
+    template <typename T>
+    inline T* uvc_realloc(T* ptr, u32 n_elements)
+    {
+        return (T*)std::realloc((void*)ptr, n_elements * sizeof(T));
+    }
+
+
+    template <typename T>
+    inline void uvc_free(T* ptr)
+    {
+        std::free(ptr);
+    }
+}
+
+
 /* utlist.h */
 
 namespace uvc
@@ -2897,7 +2924,7 @@ namespace uvc
                 if (strmh->transfers[i] == transfer)
                 {
                     UVC_DEBUG("Freeing transfer %d (%p)", i, transfer);
-                    free(transfer->buffer);
+                    uvc_free(transfer->buffer);
                     libusb_free_transfer(transfer);
                     strmh->transfers[i] = NULL;
                     break;
@@ -2937,7 +2964,7 @@ namespace uvc
                         if (strmh->transfers[i] == transfer)
                         {
                             UVC_DEBUG("Freeing failed transfer %d (%p)", i, transfer);
-                            free(transfer->buffer);
+                            uvc_free(transfer->buffer);
                             libusb_free_transfer(transfer);
                             strmh->transfers[i] = NULL;
                             break;
@@ -2962,7 +2989,7 @@ namespace uvc
                     if (strmh->transfers[i] == transfer)
                     {
                         UVC_DEBUG("Freeing orphan transfer %d (%p)", i, transfer);
-                        free(transfer->buffer);
+                        uvc_free(transfer->buffer);
                         libusb_free_transfer(transfer);
                         strmh->transfers[i] = NULL;
                         break;
@@ -3066,7 +3093,7 @@ namespace uvc
             goto fail;
         }
 
-        strmh = (uvc_stream_handle_t *)calloc(1, sizeof(*strmh));
+        strmh = (uvc_stream_handle_t *)std::calloc(1, sizeof(*strmh));
         if (!strmh)
         {
             ret = UVC_ERROR_NO_MEM;
@@ -3086,11 +3113,11 @@ namespace uvc
         // Set up the streaming status and data space
         strmh->running = 0;
 
-        strmh->outbuf = (uint8_t *)malloc(ctrl->dwMaxVideoFrameSize);
-        strmh->holdbuf = (uint8_t *)malloc(ctrl->dwMaxVideoFrameSize);
+        strmh->outbuf = (uint8_t *)std::malloc(ctrl->dwMaxVideoFrameSize);
+        strmh->holdbuf = (uint8_t *)std::malloc(ctrl->dwMaxVideoFrameSize);
 
-        strmh->meta_outbuf = (uint8_t *)malloc(LIBUVC_XFER_META_BUF_SIZE);
-        strmh->meta_holdbuf = (uint8_t *)malloc(LIBUVC_XFER_META_BUF_SIZE);
+        strmh->meta_outbuf = (uint8_t *)std::malloc(LIBUVC_XFER_META_BUF_SIZE);
+        strmh->meta_holdbuf = (uint8_t *)std::malloc(LIBUVC_XFER_META_BUF_SIZE);
         
         mutex_init(strmh->cb_mutex);
 
@@ -3103,7 +3130,7 @@ namespace uvc
 
     fail:
         if (strmh)
-            free(strmh);
+            uvc_free(strmh);
         UVC_EXIT(ret);
         return ret;
     }
@@ -3263,7 +3290,7 @@ namespace uvc
             {
                 transfer = libusb_alloc_transfer(packets_per_transfer);
                 strmh->transfers[transfer_id] = transfer;
-                strmh->transfer_bufs[transfer_id] = (uint8_t *)malloc(total_transfer_size);
+                strmh->transfer_bufs[transfer_id] = (uint8_t *)std::malloc(total_transfer_size);
 
                 libusb_fill_iso_transfer(
                     transfer, strmh->devh->usb_devh, format_desc->parent->bEndpointAddress,
@@ -3280,7 +3307,7 @@ namespace uvc
             {
                 transfer = libusb_alloc_transfer(0);
                 strmh->transfers[transfer_id] = transfer;
-                strmh->transfer_bufs[transfer_id] = (uint8_t *)malloc(
+                strmh->transfer_bufs[transfer_id] = (uint8_t *)std::malloc(
                     strmh->cur_ctrl.dwMaxPayloadTransferSize);
                 libusb_fill_bulk_transfer(transfer, strmh->devh->usb_devh,
                                           format_desc->parent->bEndpointAddress,
@@ -3306,7 +3333,7 @@ namespace uvc
         {
             for (; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; transfer_id++)
             {
-                free(strmh->transfers[transfer_id]->buffer);
+                uvc_free(strmh->transfers[transfer_id]->buffer);
                 libusb_free_transfer(strmh->transfers[transfer_id]);
                 strmh->transfers[transfer_id] = 0;
             }
@@ -3375,7 +3402,7 @@ namespace uvc
         /* copy the image data from the hold buffer to the frame (unnecessary extra buf?) */
         if (frame->data_bytes < strmh->hold_bytes)
         {
-            frame->data = realloc(frame->data, strmh->hold_bytes);
+            frame->data = std::realloc(frame->data, strmh->hold_bytes);
         }
         frame->data_bytes = strmh->hold_bytes;
         memcpy(frame->data, strmh->holdbuf, frame->data_bytes);
@@ -3384,7 +3411,7 @@ namespace uvc
         {
             if (frame->metadata_bytes < strmh->meta_hold_bytes)
             {
-                frame->metadata = realloc(frame->metadata, strmh->meta_hold_bytes);
+                frame->metadata = std::realloc(frame->metadata, strmh->meta_hold_bytes);
             }
             frame->metadata_bytes = strmh->meta_hold_bytes;
             memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
@@ -3513,18 +3540,18 @@ namespace uvc
         uvc_release_if(strmh->devh, strmh->stream_if->bInterfaceNumber);
 
         if (strmh->frame.data)
-            free(strmh->frame.data);
+            uvc_free(strmh->frame.data);
 
-        free(strmh->outbuf);
-        free(strmh->holdbuf);
+        uvc_free(strmh->outbuf);
+        uvc_free(strmh->holdbuf);
 
-        free(strmh->meta_outbuf);
-        free(strmh->meta_holdbuf);
+        uvc_free(strmh->meta_outbuf);
+        uvc_free(strmh->meta_holdbuf);
         
         mutex_destroy(strmh->cb_mutex);
 
         DL_DELETE(strmh->devh->streams, strmh);
-        free(strmh);
+        uvc_free(strmh);
     }
     
 }
@@ -3563,7 +3590,7 @@ namespace uvc
     uvc_error_t uvc_init(uvc_context_t **pctx, struct libusb_context *usb_ctx)
     {
         uvc_error_t ret = UVC_SUCCESS;
-        uvc_context_t *ctx = (uvc_context_t *)calloc(1, sizeof(*ctx));
+        uvc_context_t *ctx = (uvc_context_t *)std::calloc(1, sizeof(*ctx));
 
         if (usb_ctx == NULL)
         {
@@ -3571,7 +3598,7 @@ namespace uvc
             ctx->own_usb_ctx = 1;
             if (ret != UVC_SUCCESS)
             {
-                free(ctx);
+                uvc_free(ctx);
                 ctx = NULL;
             }
         }
@@ -3611,7 +3638,7 @@ namespace uvc
         if (ctx->own_usb_ctx)
             libusb_exit(ctx->usb_ctx);
 
-        free(ctx);
+        uvc_free(ctx);
     }
 
     /**
@@ -4197,7 +4224,7 @@ namespace uvc
         dev_idx = 0;
         found_dev = 0;
 
-        list_internal = (uvc_device_t **)malloc(sizeof(*list_internal));
+        list_internal = (uvc_device_t **)std::malloc(sizeof(*list_internal));
         *list_internal = NULL;
 
         while ((test_dev = list[dev_idx++]) != NULL)
@@ -4213,7 +4240,7 @@ namespace uvc
                 uvc_ref_device(test_dev);
 
                 num_uvc_devices++;
-                list_internal = (uvc_device_t **)realloc(list_internal, (num_uvc_devices + 1) * sizeof(*list_internal));
+                list_internal = (uvc_device_t **)std::realloc(list_internal, (num_uvc_devices + 1) * sizeof(*list_internal));
 
                 list_internal[num_uvc_devices - 1] = test_dev;
                 list_internal[num_uvc_devices] = NULL;
@@ -4288,7 +4315,7 @@ namespace uvc
             return err;
         }
 
-        dev = (uvc_device_t *)calloc(1, sizeof(uvc_device_t));
+        dev = (uvc_device_t *)std::calloc(1, sizeof(uvc_device_t));
         dev->ctx = context;
         dev->usb_dev = libusb_get_device(usb_devh);
 
@@ -4342,7 +4369,7 @@ namespace uvc
 
         uvc_ref_device(dev);
 
-        internal_devh = (uvc_device_handle_t *)calloc(1, sizeof(*internal_devh));
+        internal_devh = (uvc_device_handle_t *)std::calloc(1, sizeof(*internal_devh));
         internal_devh->dev = dev;
         internal_devh->usb_devh = usb_devh;
 
@@ -4432,7 +4459,7 @@ namespace uvc
 
         UVC_ENTER();
 
-        internal_info = (uvc_device_info_t *)calloc(1, sizeof(*internal_info));
+        internal_info = (uvc_device_info_t *)std::calloc(1, sizeof(*internal_info));
         if (!internal_info)
         {
             UVC_EXIT(UVC_ERROR_NO_MEM);
@@ -4444,7 +4471,7 @@ namespace uvc
         if (ret != 0)
         {
             print_libusb_error(ret);
-            free(internal_info);
+            uvc_free(internal_info);
             UVC_EXIT(UVC_ERROR_IO);
             return UVC_ERROR_IO;
         }
@@ -4487,19 +4514,19 @@ namespace uvc
         DL_FOREACH_SAFE(info->ctrl_if.input_term_descs, input_term, input_term_tmp)
         {
             DL_DELETE(info->ctrl_if.input_term_descs, input_term);
-            free(input_term);
+            uvc_free(input_term);
         }
 
         DL_FOREACH_SAFE(info->ctrl_if.processing_unit_descs, proc_unit, proc_unit_tmp)
         {
             DL_DELETE(info->ctrl_if.processing_unit_descs, proc_unit);
-            free(proc_unit);
+            uvc_free(proc_unit);
         }
 
         DL_FOREACH_SAFE(info->ctrl_if.extension_unit_descs, ext_unit, ext_unit_tmp)
         {
             DL_DELETE(info->ctrl_if.extension_unit_descs, ext_unit);
-            free(ext_unit);
+            uvc_free(ext_unit);
         }
 
         DL_FOREACH_SAFE(info->stream_ifs, stream_if, stream_if_tmp)
@@ -4509,10 +4536,10 @@ namespace uvc
                 DL_FOREACH_SAFE(format->frame_descs, frame, frame_tmp)
                 {
                     if (frame->intervals)
-                        free(frame->intervals);
+                        uvc_free(frame->intervals);
 
                     DL_DELETE(format->frame_descs, frame);
-                    free(frame);
+                    uvc_free(frame);
                 }
 
                 if (format->still_frame_desc)
@@ -4521,29 +4548,29 @@ namespace uvc
                     {
                         DL_FOREACH_SAFE(still_frame->imageSizePatterns, still_res, still_res_tmp)
                         {
-                            free(still_res);
+                            uvc_free(still_res);
                         }
 
                         if (still_frame->bCompression)
                         {
-                            free(still_frame->bCompression);
+                            uvc_free(still_frame->bCompression);
                         }
-                        free(still_frame);
+                        uvc_free(still_frame);
                     }
                 }
 
                 DL_DELETE(stream_if->format_descs, format);
-                free(format);
+                uvc_free(format);
             }
 
             DL_DELETE(info->stream_ifs, stream_if);
-            free(stream_if);
+            uvc_free(stream_if);
         }
 
         if (info->config)
             libusb_free_config_descriptor(info->config);
 
-        free(info);
+        uvc_free(info);
 
         UVC_EXIT_VOID();
     }
@@ -4568,7 +4595,7 @@ namespace uvc
             return ret;
         }
 
-        desc_internal = (uvc_device_descriptor_t *)calloc(1, sizeof(*desc_internal));
+        desc_internal = (uvc_device_descriptor_t *)std::calloc(1, sizeof(*desc_internal));
         desc_internal->idVendor = usb_desc.idVendor;
         desc_internal->idProduct = usb_desc.idProduct;
 
@@ -4650,7 +4677,7 @@ namespace uvc
             return ret;
         }
 
-        desc_internal = (uvc_device_descriptor_t *)calloc(1, sizeof(*desc_internal));
+        desc_internal = (uvc_device_descriptor_t *)std::calloc(1, sizeof(*desc_internal));
         desc_internal->idVendor = usb_desc.idVendor;
         desc_internal->idProduct = usb_desc.idProduct;
 
@@ -4727,15 +4754,15 @@ namespace uvc
         UVC_ENTER();
 
         if (desc->serialNumber)
-            free((void *)desc->serialNumber);
+            uvc_free((void *)desc->serialNumber);
 
         if (desc->manufacturer)
-            free((void *)desc->manufacturer);
+            uvc_free((void *)desc->manufacturer);
 
         if (desc->product)
-            free((void *)desc->product);
+            uvc_free((void *)desc->product);
 
-        free(desc);
+        uvc_free(desc);
 
         UVC_EXIT_VOID();
     }
@@ -4785,7 +4812,7 @@ namespace uvc
             return UVC_ERROR_IO;
         }
 
-        list_internal = (uvc_device_t **)malloc(sizeof(*list_internal));
+        list_internal = (uvc_device_t **)std::malloc(sizeof(*list_internal));
         *list_internal = NULL;
 
         num_uvc_devices = 0;
@@ -4843,14 +4870,14 @@ namespace uvc
 
             if (got_interface)
             {
-                uvc_device_t *uvc_dev = (uvc_device_t *)malloc(sizeof(*uvc_dev));
+                uvc_device_t *uvc_dev = (uvc_device_t *)std::malloc(sizeof(*uvc_dev));
                 uvc_dev->ctx = ctx;
                 uvc_dev->ref = 0;
                 uvc_dev->usb_dev = usb_dev;
                 uvc_ref_device(uvc_dev);
 
                 num_uvc_devices++;
-                list_internal = (uvc_device_t **)realloc(list_internal, (num_uvc_devices + 1) * sizeof(*list_internal));
+                list_internal = (uvc_device_t **)std::realloc(list_internal, (num_uvc_devices + 1) * sizeof(*list_internal));
 
                 list_internal[num_uvc_devices - 1] = uvc_dev;
                 list_internal[num_uvc_devices] = NULL;
@@ -4894,7 +4921,7 @@ namespace uvc
             }
         }
 
-        free(list);
+        uvc_free(list);
 
         UVC_EXIT_VOID();
     }
@@ -5057,7 +5084,7 @@ namespace uvc
         dev->ref--;
 
         if (dev->ref == 0)
-            free(dev);
+            uvc_free(dev);
 
         UVC_EXIT_VOID();
     }
@@ -5300,7 +5327,7 @@ namespace uvc
             return UVC_SUCCESS;
         }
 
-        term = (uvc_input_terminal_t *)calloc(1, sizeof(*term));
+        term = (uvc_input_terminal_t *)std::calloc(1, sizeof(*term));
 
         term->bTerminalID = block[3];
         term->wTerminalType = (enum uvc_it_type)SW_TO_SHORT(&block[4]);
@@ -5330,7 +5357,7 @@ namespace uvc
 
         UVC_ENTER();
 
-        unit = (uvc_processing_unit_t *)calloc(1, sizeof(*unit));
+        unit = (uvc_processing_unit_t *)std::calloc(1, sizeof(*unit));
         unit->bUnitID = block[3];
         unit->bSourceID = block[4];
 
@@ -5355,7 +5382,7 @@ namespace uvc
 
         UVC_ENTER();
 
-        unit = (uvc_selector_unit_t *)calloc(1, sizeof(*unit));
+        unit = (uvc_selector_unit_t *)std::calloc(1, sizeof(*unit));
         unit->bUnitID = block[3];
 
         DL_APPEND(info->ctrl_if.selector_unit_descs, unit);
@@ -5372,7 +5399,7 @@ namespace uvc
                                             uvc_device_info_t *info,
                                             const unsigned char *block, size_t block_size)
     {
-        uvc_extension_unit_t *unit = (uvc_extension_unit_t *)calloc(1, sizeof(*unit));
+        uvc_extension_unit_t *unit = (uvc_extension_unit_t *)std::calloc(1, sizeof(*unit));
         const uint8_t *start_of_controls;
         int size_of_controls, num_in_pins;
         int i;
@@ -5466,7 +5493,7 @@ namespace uvc
         buffer = if_desc->extra;
         buffer_left = if_desc->extra_length;
 
-        stream_if = (uvc_streaming_interface_t *)calloc(1, sizeof(*stream_if));
+        stream_if = (uvc_streaming_interface_t *)std::calloc(1, sizeof(*stream_if));
         stream_if->parent = info;
         stream_if->bInterfaceNumber = if_desc->bInterfaceNumber;
         DL_APPEND(info->stream_ifs, stream_if);
@@ -5518,7 +5545,7 @@ namespace uvc
     {
         UVC_ENTER();
 
-        uvc_format_desc_t *format = (uvc_format_desc_t *)calloc(1, sizeof(*format));
+        uvc_format_desc_t *format = (uvc_format_desc_t *)std::calloc(1, sizeof(*format));
 
         format->parent = stream_if;
         format->bDescriptorSubtype = (enum uvc_vs_desc_subtype)block[2];
@@ -5549,7 +5576,7 @@ namespace uvc
     {
         UVC_ENTER();
 
-        uvc_format_desc_t *format = (uvc_format_desc_t *)calloc(1, sizeof(*format));
+        uvc_format_desc_t *format = (uvc_format_desc_t *)std::calloc(1, sizeof(*format));
 
         format->parent = stream_if;
         format->bDescriptorSubtype = (enum uvc_vs_desc_subtype)block[2];
@@ -5580,7 +5607,7 @@ namespace uvc
     {
         UVC_ENTER();
 
-        uvc_format_desc_t *format = (uvc_format_desc_t *)calloc(1, sizeof(*format));
+        uvc_format_desc_t *format = (uvc_format_desc_t *)std::calloc(1, sizeof(*format));
 
         format->parent = stream_if;
         format->bDescriptorSubtype = (enum uvc_vs_desc_subtype)block[2];
@@ -5617,7 +5644,7 @@ namespace uvc
         UVC_ENTER();
 
         format = stream_if->format_descs->prev;
-        frame = (uvc_frame_desc_t *)calloc(1, sizeof(*frame));
+        frame = (uvc_frame_desc_t *)std::calloc(1, sizeof(*frame));
 
         frame->parent = format;
 
@@ -5640,7 +5667,7 @@ namespace uvc
         }
         else
         {
-            frame->intervals = (uint32_t *)calloc(block[21] + 1, sizeof(frame->intervals[0]));
+            frame->intervals = (uint32_t *)std::calloc(block[21] + 1, sizeof(frame->intervals[0]));
             p = &block[26];
 
             for (i = 0; i < block[21]; ++i)
@@ -5674,7 +5701,7 @@ namespace uvc
         UVC_ENTER();
 
         format = stream_if->format_descs->prev;
-        frame = (uvc_frame_desc_t *)calloc(1, sizeof(*frame));
+        frame = (uvc_frame_desc_t *)std::calloc(1, sizeof(*frame));
 
         frame->parent = format;
 
@@ -5697,7 +5724,7 @@ namespace uvc
         }
         else
         {
-            frame->intervals = (uint32_t *)calloc(block[25] + 1, sizeof(frame->intervals[0]));
+            frame->intervals = (uint32_t *)std::calloc(block[25] + 1, sizeof(frame->intervals[0]));
             p = &block[26];
 
             for (i = 0; i < block[25]; ++i)
@@ -5732,7 +5759,7 @@ namespace uvc
         UVC_ENTER();
 
         format = stream_if->format_descs->prev;
-        frame = (struct uvc_still_frame_desc *)calloc(1, sizeof(*frame));
+        frame = (struct uvc_still_frame_desc *)std::calloc(1, sizeof(*frame));
 
         frame->parent = format;
 
@@ -5746,7 +5773,7 @@ namespace uvc
 
         for (i = 1; i <= numImageSizePatterns; ++i)
         {
-            uvc_still_frame_res_t *res = (uvc_still_frame_res_t *)calloc(1, sizeof(uvc_still_frame_res_t));
+            uvc_still_frame_res_t *res = (uvc_still_frame_res_t *)std::calloc(1, sizeof(uvc_still_frame_res_t));
             res->bResolutionIndex = i;
             res->wWidth = SW_TO_SHORT(p);
             p += 2;
@@ -5761,7 +5788,7 @@ namespace uvc
 
         if (frame->bNumCompressionPattern)
         {
-            frame->bCompression = (uint8_t *)calloc(frame->bNumCompressionPattern, sizeof(frame->bCompression[0]));
+            frame->bCompression = (uint8_t *)std::calloc(frame->bNumCompressionPattern, sizeof(frame->bCompression[0]));
             for (i = 0; i < frame->bNumCompressionPattern; ++i)
             {
                 ++p;
@@ -5860,7 +5887,7 @@ namespace uvc
         if (devh->status_xfer)
             libusb_free_transfer(devh->status_xfer);
 
-        free(devh);
+        uvc_free(devh);
 
         UVC_EXIT_VOID();
     }
@@ -8735,7 +8762,7 @@ namespace uvc
         if (!frame->data || frame->data_bytes != need_bytes)
         {
             frame->data_bytes = need_bytes;
-            frame->data = realloc(frame->data, frame->data_bytes);
+            frame->data = std::realloc(frame->data, frame->data_bytes);
         }
         if (!frame->data)
             return UVC_ERROR_NO_MEM;
@@ -8751,7 +8778,7 @@ namespace uvc
      */
     uvc_frame_t *uvc_allocate_frame(size_t data_bytes)
     {
-        uvc_frame_t *frame = (uvc_frame_t *)malloc(sizeof(*frame));
+        uvc_frame_t *frame = (uvc_frame_t *)std::malloc(sizeof(*frame));
 
         if (!frame)
             return NULL;
@@ -8761,11 +8788,11 @@ namespace uvc
         if (data_bytes > 0)
         {
             frame->data_bytes = data_bytes;
-            frame->data = malloc(data_bytes);
+            frame->data = std::malloc(data_bytes);
 
             if (!frame->data)
             {
-                free(frame);
+                uvc_free(frame);
                 return NULL;
             }
         }
@@ -8781,12 +8808,12 @@ namespace uvc
     void uvc_free_frame(uvc_frame_t *frame)
     {
         if (frame->data_bytes > 0)
-            free(frame->data);
+            uvc_free(frame->data);
 
         if (frame->metadata_bytes > 0)
-            free(frame->metadata);
+            uvc_free(frame->metadata);
 
-        free(frame);
+        uvc_free(frame);
     }
 
     static inline unsigned char sat(int i)
@@ -8820,7 +8847,7 @@ namespace uvc
         {
             if (out->metadata_bytes < in->metadata_bytes)
             {
-                out->metadata = realloc(out->metadata, in->metadata_bytes);
+                out->metadata = std::realloc(out->metadata, in->metadata_bytes);
             }
             out->metadata_bytes = in->metadata_bytes;
             memcpy(out->metadata, in->metadata, in->metadata_bytes);
