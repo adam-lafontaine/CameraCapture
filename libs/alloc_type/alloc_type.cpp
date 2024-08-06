@@ -1,15 +1,8 @@
 #pragma once
 
 #include "alloc_type.hpp"
-#include "../span/span.hpp"
 
 #include <cstdlib>
-#include <cassert>
-#include <vector>
-#include <cstdio>
-
-template <typename T>
-using List = std::vector<T>;
 
 //#define LOG_ALLOC_TYPE
 
@@ -51,7 +44,7 @@ namespace mem
 
 #if defined _WIN32
 
-        return std::malloc(n_elements * element_size);
+        return std::calloc(n_elements, element_size);
 
 #else
         size_t alignment = 1;
@@ -66,7 +59,7 @@ namespace mem
             break;
         
         default:
-            return std::malloc(n_elements * element_size);
+            return std::calloc(n_elements, element_size);
         }
 
 #endif
@@ -99,6 +92,16 @@ namespace mem
 }
 
 #else
+
+
+#include "../span/span.hpp"
+
+#include <cassert>
+#include <vector>
+#include <cstdio>
+
+template <typename T>
+using List = std::vector<T>;
 
 
 namespace counts

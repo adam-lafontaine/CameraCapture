@@ -491,7 +491,8 @@ namespace uvc
     typedef struct uvc_frame
     {
         /** Image data for this frame */
-        void *data;
+        uint8_t *data;
+
         /** Size of image data buffer */
         size_t data_bytes;
         /** Width of image in pixels */
@@ -517,7 +518,8 @@ namespace uvc
         uvc_device_handle_t *source;
         
         /** Metadata for this frame if available */
-        void *metadata;
+        uint8_t *metadata;
+
         /** Size of metadata buffer */
         size_t metadata_bytes;
     } uvc_frame_t;
@@ -995,10 +997,10 @@ namespace uvc
     }
 
 
-    inline void* uvc_malloc_void(u32 n_bytes)
+    /*inline void* uvc_malloc_void(u32 n_bytes)
     {
         return std::malloc(n_bytes);
-    }
+    }*/
 
 
     template <typename T>
@@ -1008,10 +1010,10 @@ namespace uvc
     }
 
 
-    inline void* uvc_realloc_void(void* ptr, u32 n_bytes)
+    /*inline void* uvc_realloc_void(void* ptr, u32 n_bytes)
     {
         return std::realloc(ptr, n_bytes);
-    }
+    }*/
 
 
     template <typename T>
@@ -3414,7 +3416,7 @@ namespace uvc
         /* copy the image data from the hold buffer to the frame (unnecessary extra buf?) */
         if (frame->data_bytes < strmh->hold_bytes)
         {
-            frame->data = uvc_realloc_void(frame->data, strmh->hold_bytes);
+            frame->data = uvc_realloc(frame->data, strmh->hold_bytes);
         }
         frame->data_bytes = strmh->hold_bytes;
         memcpy(frame->data, strmh->holdbuf, frame->data_bytes);
@@ -3423,7 +3425,7 @@ namespace uvc
         {
             if (frame->metadata_bytes < strmh->meta_hold_bytes)
             {
-                frame->metadata = uvc_realloc_void(frame->metadata, strmh->meta_hold_bytes);
+                frame->metadata = uvc_realloc(frame->metadata, strmh->meta_hold_bytes);
             }
             frame->metadata_bytes = strmh->meta_hold_bytes;
             memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
@@ -8774,7 +8776,7 @@ namespace uvc
         if (!frame->data || frame->data_bytes != need_bytes)
         {
             frame->data_bytes = need_bytes;
-            frame->data = uvc_realloc_void(frame->data, frame->data_bytes);
+            frame->data = uvc_realloc(frame->data, frame->data_bytes);
         }
         if (!frame->data)
             return UVC_ERROR_NO_MEM;
@@ -8800,7 +8802,7 @@ namespace uvc
         if (data_bytes > 0)
         {
             frame->data_bytes = data_bytes;
-            frame->data = uvc_malloc_void(data_bytes);
+            frame->data = uvc_malloc<uint8_t>(data_bytes);
 
             if (!frame->data)
             {
@@ -8859,7 +8861,7 @@ namespace uvc
         {
             if (out->metadata_bytes < in->metadata_bytes)
             {
-                out->metadata = uvc_realloc_void(out->metadata, in->metadata_bytes);
+                out->metadata = uvc_realloc(out->metadata, in->metadata_bytes);
             }
             out->metadata_bytes = in->metadata_bytes;
             memcpy(out->metadata, in->metadata, in->metadata_bytes);
