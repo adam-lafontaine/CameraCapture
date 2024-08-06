@@ -7,7 +7,19 @@ namespace mem_uvc
 
     void* realloc(void* ptr, u32 n_elements, u32 element_size);
 
-    void free(void* ptr);    
+    void free(void* ptr);
+
+
+    class Stats
+    {
+    public:
+
+        u32 count = 0;
+        u32 bytes = 0;
+    };
+
+
+    Stats get_stats();
 }
 
 

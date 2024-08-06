@@ -95,6 +95,7 @@ static void ui_diagnostics_window()
     ImGui::Begin("Diagnostics");
 
     diagnostics::show_memory();
+    diagnostics::show_uvc_memory();
 
     ImGui::End();
 }

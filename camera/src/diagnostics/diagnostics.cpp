@@ -2,11 +2,15 @@
 
 #include "../../../libs/imgui/imgui.h"
 
+//#define ALLOC_COUNT
+
 #ifndef ALLOC_COUNT
 
 namespace diagnostics
 {
     void show_memory(){}
+
+    void show_uvc_memory(){}
 }
 
 #else
@@ -277,8 +281,54 @@ namespace diagnostics
 
         ImGui::EndTable();
     }
+}
 
 
+#include "../../../libs/usb/mem_uvc.hpp"
+
+
+namespace diagnostics
+{
+    static void uvc_memory_plot()
+    {
+        constexpr f32 plot_min = 0.0f;
+        constexpr auto data_stride = sizeof(f32);
+        constexpr auto plot_size = ImVec2(0, 80.0f);
+        constexpr int data_count = 256;
+
+        static f32 plot_max = 200.0f;
+
+        static f32 plot_data[2 * data_count] = { 0 };
+        static u8 begin = 0;
+        static u16 end = 256;
+
+        auto stats = mem_uvc::get_stats();
+
+        plot_data[begin] = plot_data[end] = (f32)stats.count;
+        ++begin;
+        end = begin + 256;        
+
+        auto data_offset = (int)begin;
+
+        char overlay[32] = { 0 };
+        qsnprintf(overlay, 32, "# Allocations: %u", stats.count);
+
+        // https://github.com/epezent/implot/tree/master
+        
+        ImGui::PlotLines("##UVCMemoryPlot", 
+            plot_data, 
+            data_count, 
+            data_offset, 
+            overlay,
+            plot_min, plot_max, 
+            plot_size, 
+            data_stride);
+    }
+}
+
+
+namespace diagnostics
+{
     void show_memory()
     {
         if (!ImGui::CollapsingHeader("Memory"))
@@ -290,6 +340,16 @@ namespace diagnostics
         alloc_history_table();
     }
 
+
+    void show_uvc_memory()
+    {
+        if (!ImGui::CollapsingHeader("UVC"))
+        {
+            return;
+        }
+
+        uvc_memory_plot();
+    }
 }
 
 #endif
