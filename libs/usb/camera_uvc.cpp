@@ -435,6 +435,11 @@ namespace camera_usb
 
     static bool grab_and_convert_frame_rgba(DeviceUVC& device)
     {
+        if (device.status < DeviceStatus::StreamReady)
+        {
+            return false;
+        }
+
         uvc::frame* in_frame;
 
         auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
@@ -597,11 +602,13 @@ namespace camera_usb
     {
         auto& device = uvc_list.devices[camera.id];
 
-        auto status = camera.status;
+        auto c_status = camera.status;
+        auto d_status = device.status;
 
         camera.status = CameraStatus::Streaming;
+        device.status = DeviceStatus::StreamRunning;
 
-        while (stream_condition())
+        while (stream_condition() && device.status == DeviceStatus::StreamRunning)
         {
             if (grab_and_convert_frame_rgba(device))
             {
@@ -609,7 +616,11 @@ namespace camera_usb
             }
         }
 
-        camera.status = status;
+        if (device.status != DeviceStatus::Inactive)
+        {
+            camera.status = c_status;
+            device.status = d_status;
+        }
     }
 }
 

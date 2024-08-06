@@ -5,7 +5,7 @@ GPP := g++-11 -std=c++20 -mavx
 
 GPP += -DIMAGE_READ
 #GPP += -DIMAGE_WRITE
-#GPP += -DALLOC_COUNT
+GPP += -DALLOC_COUNT
 
 NO_FLAGS := 
 SDL2   := `sdl2-config --cflags --libs`
@@ -168,10 +168,13 @@ sdl_input_c += $(numeric_h)
 
 camera_usb_h := $(usb)/camera_usb.hpp
 libuvc_h     := $(usb)/libuvc3.hpp
+mem_uvc_h    := $(usb)/mem_uvc.hpp
 
 camera_usb_c := $(usb)/camera_uvc.cpp
 camera_usb_c += $(camera_usb_h)
 camera_usb_c += $(libuvc_h)
+camera_usb_c += $(mem_uvc_h)
+camera_usb_c += $(usb)/mem_uvc.cpp
 
 #**********
 

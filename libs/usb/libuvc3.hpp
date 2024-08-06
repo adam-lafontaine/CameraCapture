@@ -986,51 +986,8 @@ namespace uvc
 
 
 /* memory */
-#include <cstdlib> // temp
-//#include "../alloc_type/alloc_type.hpp"
 
-namespace uvc
-{
-    template <typename T>
-    inline T* uvc_malloc(cstr tag)
-    {
-        //return (T*)std::calloc(n_elements, sizeof(T));
-        return mem::malloc<T>(1, tag);
-    }
-
-
-    template <typename T>
-    inline T* uvc_malloc(u32 n_elements, cstr tag)
-    {
-        //return (T*)std::calloc(n_elements, sizeof(T));
-        return mem::malloc<T>(n_elements, tag);
-    }
-
-
-    template <typename T>
-    inline T* uvc_realloc(T* ptr, u32 n_elements)
-    {
-        //return (T*)std::realloc((void*)ptr, n_elements * sizeof(T));
-        return mem::realloc<T>(ptr, n_elements);
-
-        //mem::free(ptr);
-        //return mem::malloc<T>(n_elements, "uvc");
-    }
-
-
-    template <typename T>
-    inline void uvc_free(T* ptr)
-    {
-        //std::free(ptr);
-        mem::free(ptr);
-    }
-
-
-    inline void uvc_free_string(cstr str)
-    {
-        std::free((void*)str);
-    }
-}
+#include "mem_uvc.hpp"
 
 
 /* utlist.h */
@@ -3309,7 +3266,6 @@ namespace uvc
             }
 
             /* Set up the transfers */
-            // TODO: large buffer
             for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS; ++transfer_id)
             {
                 transfer = libusb_alloc_transfer(packets_per_transfer);
@@ -3326,7 +3282,6 @@ namespace uvc
         }
         else
         {
-            // TODO: large buffer
             for (transfer_id = 0; transfer_id < LIBUVC_NUM_TRANSFER_BUFS;
                  ++transfer_id)
             {
@@ -9607,5 +9562,8 @@ namespace opt
 #endif 
 
 }}
+
+
+#include "mem_uvc.cpp"
 
 #endif // LIBUVC_IMPLEMENTATION

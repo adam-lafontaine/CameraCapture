@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <cstdio>
 
-#define LOG_ALLOC_TYPE
+//#define LOG_ALLOC_TYPE
 
 #if !defined NDEBUG && defined LOG_ALLOC_TYPE
 
@@ -216,9 +216,15 @@ namespace counts
             return 0;
         }
 
-        size_t const n_bytes = n_elements * ac.element_size;
+        void* data = 0;
 
-        auto data = std::aligned_alloc(ac.element_size, n_bytes);
+#if defined _WIN32
+        data = std::calloc(n_elements, ac.element_size);
+#else
+        size_t const n_bytes = n_elements * ac.element_size;
+        data = std::aligned_alloc(ac.element_size, n_bytes);
+#endif
+
         assert(data && "Allocation failed");
         if (!data)
         {
