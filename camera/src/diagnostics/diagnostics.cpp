@@ -2,6 +2,15 @@
 
 #include "../../../libs/imgui/imgui.h"
 
+#ifndef ALLOC_COUNT
+
+namespace diagnostics
+{
+    void show_memory(){}
+}
+
+#else
+
 
 /* memory */
 
@@ -282,3 +291,5 @@ namespace diagnostics
     }
 
 }
+
+#endif

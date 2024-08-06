@@ -5,7 +5,7 @@ GPP := g++-11 -std=c++20 -mavx
 
 GPP += -DIMAGE_READ
 #GPP += -DIMAGE_WRITE
-GPP += -DALLOC_COUNT
+#GPP += -DALLOC_COUNT
 
 NO_FLAGS := 
 SDL2   := `sdl2-config --cflags --libs`

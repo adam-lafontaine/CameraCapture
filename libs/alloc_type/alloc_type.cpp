@@ -3,8 +3,9 @@
 #include "alloc_type.hpp"
 
 #include <cstdlib>
+#include <cstdio>
 
-//#define LOG_ALLOC_TYPE
+#define LOG_ALLOC_TYPE
 
 #if !defined NDEBUG && defined LOG_ALLOC_TYPE
 
@@ -34,7 +35,7 @@ namespace mem
 
     void untag_any(void* ptr)
     {
-        alloc_type_log("untag_any(%s)\n", ptr);
+        alloc_type_log("untag_any(%p)\n", ptr);
     }
 
     
@@ -66,6 +67,13 @@ namespace mem
     }
 
 
+    void* realloc_memory(void* ptr, u32 n_elements, u32 element_size)
+    {
+        alloc_type_log("realloc_memory(%p, %u, %u)", ptr, n_elements, element_size);
+        return std::realloc(ptr, n_elements * element_size);
+    }
+
+
     void free_memory(void* ptr, u32 element_size)
     {
         alloc_type_log("free_memory(%p, %u)\n", ptr, element_size);
@@ -81,7 +89,7 @@ namespace mem
 
     void tag_file_memory(void* ptr, u32 element_size, cstr file_path)
     {
-        alloc_type_log("tag_file_memory(%p, %u, %s)", ptr, n_elements, file_path);
+        alloc_type_log("tag_file_memory(%p, %u, %s)", ptr, element_size, file_path);
     }
 
 
@@ -98,7 +106,7 @@ namespace mem
 
 #include <cassert>
 #include <vector>
-#include <cstdio>
+
 
 template <typename T>
 using List = std::vector<T>;
@@ -232,6 +240,42 @@ namespace counts
 
 
     template <class AC>
+    static void* update_allocation(AC& ac, void* ptr, u32 n_elements)
+    {
+        static_assert(ac.max_allocations <= mem::AllocationStatus::MAX_SLOTS);
+
+        // find slot
+        u32 i = 0;
+        for (; ac.keys[i] != ptr && i < ac.max_allocations; i++)
+        { }
+
+        assert(i < ac.max_allocations && " *** Allocation not found ***");
+        if (i >= ac.max_allocations)
+        {
+            return 0;
+        }
+
+        size_t const n_bytes = n_elements * ac.element_size;
+
+        auto data = std::realloc(ptr, n_bytes);
+        assert(data && "Allocation failed");
+        if (!data)
+        {
+            return 0;
+        }
+
+        ac.bytes_allocated -= ac.byte_counts[i];
+        ac.bytes_allocated += n_bytes - ac.byte_counts[i];
+        ac.keys[i] = data;
+        ac.byte_counts[i] = n_bytes;
+
+        log_alloc(ac, "realloc", i);
+
+        return data;
+    }
+
+
+    template <class AC>
     static bool remove_allocation(AC& ac, void* ptr)
     {
         static_assert(ac.max_allocations <= mem::AllocationStatus::MAX_SLOTS);
@@ -241,6 +285,7 @@ namespace counts
         for (; ac.keys[i] != ptr && i < ac.max_allocations; i++)
         { }
         
+        assert(i < ac.max_allocations && " *** Allocation not found ***");
         if (i >= ac.max_allocations)
         {
             //alloc_type_log("Allocation not found (%u)\n", ac.element_size);
@@ -252,7 +297,7 @@ namespace counts
         std::free(ac.keys[i]);
 
         ac.n_allocations--;
-        ac.bytes_allocated -= ac.byte_counts[i];        
+        ac.bytes_allocated -= ac.byte_counts[i];
         ac.keys[i] = 0;        
         ac.tags[i] = 0;
         ac.byte_counts[i] = 0;
@@ -377,6 +422,34 @@ namespace mem
         default:
             // TODO: custom alignments
             return counts::add_allocation(alloc_8, n_elements * element_size, tag);
+        }
+    }
+}
+
+
+/* realloc */
+
+namespace mem
+{
+    void* realloc_memory(void* ptr, u32 n_elements, u32 element_size)
+    {
+        switch (element_size)
+        {
+        case 1:
+            return counts::update_allocation(alloc_8, ptr, n_elements);
+
+        case 2:
+            return counts::update_allocation(alloc_16, ptr, n_elements);
+
+        case 4:
+            return counts::update_allocation(alloc_32, ptr, n_elements);
+
+        case 8:
+            return counts::update_allocation(alloc_64, ptr, n_elements);
+        
+        default:
+            // TODO: custom alignments
+            return counts::update_allocation(alloc_8, ptr, n_elements * element_size);
         }
     }
 }
@@ -510,7 +583,7 @@ namespace mem
 
     void tag_file_memory(void* ptr, u32 element_size, cstr file_path)
     {
-        alloc_type_log("tag_file_memory(%p, %u, %s)", ptr, n_elements, file_path);
+        alloc_type_log("tag_file_memory(%p, %u, %s)", ptr, element_size, file_path);
 
         auto size = file_size(file_path);
         counts::tag_allocation(alloc_8, ptr, size, get_file_name(file_path));
