@@ -626,4 +626,5 @@ namespace camera_usb
 
 
 #define LIBUVC_IMPLEMENTATION
+#define LIBUVC_NUM_TRANSFER_BUFS 50
 #include "libuvc3.hpp"

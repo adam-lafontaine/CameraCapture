@@ -29,29 +29,50 @@ namespace diagnostics
     }
 
 
-    static void bytes_text(auto bytes)
+    class ValueSuffix
     {
-        auto suffix = "B";
+    public:
+        f32 value = 0.0f;
+        char suffix = 'B';
+    };
+
+
+    static ValueSuffix bytes_suffix(auto bytes)
+    {
+        ValueSuffix vs{};
+
+        auto suffix = 'B';
         auto num = (f32)bytes;
 
         if (num >= 1'000'000'000.0f)
         {
             num /= 1'000'000'000.0f;
-            suffix = "G";
+            suffix = 'G';
         }
         else if (num >= 1'000'000.0f)
         {
             num /= 1'000'000.0f;
-            suffix = "M";            
+            suffix = 'M';            
         }
         else if (num >= 1'000.0f)
         {
             num /= 1'000.0f;
-            suffix = "K";
+            suffix = 'K';
         }
 
+        vs.value = num;
+        vs.suffix = suffix;
+
+        return vs;
+    }
+
+
+    static void bytes_text(auto bytes)
+    {
+        auto vs = bytes_suffix(bytes);
+
         char text[32] = { 0 };
-        qsnprintf(text, 32, "%5.1f %s", num, suffix);
+        qsnprintf(text, 32, "%5.1f %c", vs.value, vs.suffix);
 
         ImGui::Text("%s", text);
     }
@@ -289,46 +310,6 @@ namespace diagnostics
 
 namespace diagnostics
 {
-    static void uvc_memory_plot()
-    {
-        constexpr f32 plot_min = 0.0f;
-        constexpr auto data_stride = sizeof(f32);
-        constexpr auto plot_size = ImVec2(0, 80.0f);
-        constexpr int data_count = 256;
-
-        static f32 plot_max = 200.0f;
-
-        static f32 plot_data[2 * data_count] = { 0 };
-        static u8 begin = 0;
-        static u16 end = 256;
-
-        auto stats = mem_uvc::get_stats();
-
-        plot_data[begin] = plot_data[end] = (f32)stats.count;
-        ++begin;
-        end = begin + 256;        
-
-        auto data_offset = (int)begin;
-
-        char overlay[32] = { 0 };
-        qsnprintf(overlay, 32, "# Allocations: %u", stats.count);
-
-        // https://github.com/epezent/implot/tree/master
-        
-        ImGui::PlotLines("##UVCMemoryPlot", 
-            plot_data, 
-            data_count, 
-            data_offset, 
-            overlay,
-            plot_min, plot_max, 
-            plot_size, 
-            data_stride);
-    }
-}
-
-
-namespace diagnostics
-{
     void show_memory()
     {
         if (!ImGui::CollapsingHeader("Memory"))
@@ -348,7 +329,16 @@ namespace diagnostics
             return;
         }
 
-        uvc_memory_plot();
+        auto stats = mem_uvc::get_stats();
+
+        ImGui::Text("# Allocations: %u", stats.count);
+
+        auto vs = bytes_suffix(stats.bytes);
+        ImGui::Text("Total bytes: %u (%3.1f %c)", stats.bytes, vs.value, vs.suffix);
+
+        ImGui::Text(" malloc: %u", stats.malloc);
+        ImGui::Text("realloc: %u", stats.realloc);
+        ImGui::Text("   free: %u", stats.free);
     }
 }
 

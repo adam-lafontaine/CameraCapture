@@ -14,6 +14,10 @@ namespace mem_uvc
     {
     public:
 
+        u32 malloc = 0;
+        u32 realloc = 0;
+        u32 free = 0;
+
         u32 count = 0;
         u32 bytes = 0;
     };
