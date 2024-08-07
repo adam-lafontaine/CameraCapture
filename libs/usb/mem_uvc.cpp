@@ -14,7 +14,14 @@ namespace mem_uvc
 
     static u32 alloc_bytes = 0;
 
-    static std::unordered_map<u64, u32> ptr_bytes;
+    class MemoryTag
+    {
+    public:
+        u32 bytes = 0;
+        cstr tag = 0;
+    };
+
+    static std::unordered_map<u64, MemoryTag> ptr_tags;
 
 
     Stats get_stats()
@@ -43,15 +50,16 @@ namespace mem_uvc
 
         malloc_count++;
         auto data = std::calloc(n_elements, element_size);
-        ptr_bytes[(u64)data] = bytes;
+        ptr_tags[(u64)data] = { bytes, tag };
 
         return data;
     }
 
 
     void* realloc(void* ptr, u32 n_elements, u32 element_size)
-    {        
-        auto bytes = ptr_bytes[(u64)ptr];
+    {      
+        auto& tag = ptr_tags[(u64)ptr];
+        auto bytes = tag.bytes;
         auto new_bytes = n_elements * element_size;
 
         if (new_bytes <= bytes)
@@ -64,7 +72,7 @@ namespace mem_uvc
 
         realloc_count++;
         auto data = std::realloc(ptr, new_bytes);
-        ptr_bytes[(u64)data] = new_bytes;
+        ptr_tags[(u64)data] = { new_bytes, tag.tag };
 
         return data;
     }
@@ -74,7 +82,7 @@ namespace mem_uvc
     {        
         alloc_count--;
 
-        auto bytes = ptr_bytes[(u64)ptr];
+        auto bytes = ptr_tags[(u64)ptr].bytes;
         alloc_bytes -= bytes;
 
         free_count++;
