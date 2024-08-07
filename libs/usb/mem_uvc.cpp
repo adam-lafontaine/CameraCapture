@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 #include <string.h>
-#include <unordered_map>
 
 
 namespace mem_uvc
@@ -22,8 +21,6 @@ namespace mem_uvc
         cstr tag = 0;
     };
 
-    static std::unordered_map<u64, MemoryTag> ptr_tags;
-
 
     Stats get_stats()
     {
@@ -41,8 +38,54 @@ namespace mem_uvc
 }
 
 
+#ifndef LIBUVC_TRACK_MEMORY
+
 namespace mem_uvc
 {
+    void* malloc(u32 n_elements, u32 element_size, cstr tag)
+    {
+        return std::calloc(n_elements, element_size);
+    }
+
+
+    void* realloc(void* ptr, u32 n_elements, u32 element_size)
+    {
+        return std::realloc(ptr, n_elements * element_size);
+    }
+
+
+    char* str_dup(cstr str, cstr tag)
+    {
+#ifdef _WIN32
+
+        return _strdup(str);
+
+#else
+
+        return strdup(str);
+
+#endif // _WIN32
+    }
+
+
+    void free(void* ptr)
+    {
+        std::free(ptr);
+    }
+}
+
+#else
+
+
+#include <unordered_map>
+
+
+namespace mem_uvc
+{
+    static std::unordered_map<u64, MemoryTag> ptr_tags;
+
+
+
     void* malloc(u32 n_elements, u32 element_size, cstr tag)
     {       
         alloc_count++;
@@ -92,9 +135,9 @@ namespace mem_uvc
 
         data = strdup(str);
 
-#endif
+#endif // _WIN32
 
-        malloc_count++;
+        
         auto bytes = (u32)strlen(str) + 1;
         ptr_tags[(u64)data] = { bytes, tag };
 
@@ -113,3 +156,5 @@ namespace mem_uvc
         std::free(ptr);
     }
 }
+
+#endif // LIBUVC_TRACK_MEMORY

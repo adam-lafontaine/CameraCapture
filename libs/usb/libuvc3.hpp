@@ -879,7 +879,6 @@ namespace opt
 #ifdef LIBUVC_IMPLEMENTATION
 
 #include <assert.h>
-#include <string.h>
 #include <signal.h>
 #include <pthread.h>
 
