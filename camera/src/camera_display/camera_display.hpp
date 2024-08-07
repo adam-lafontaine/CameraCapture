@@ -8,9 +8,6 @@ namespace cam = camera_usb;
 
 namespace camera_display
 {
-    
-
-
     class CameraState
     {
     public:
@@ -22,6 +19,8 @@ namespace camera_display
         bool is_connected() const { return cameras.status == cam::ConnectionStatus::Connected; }
 
         bool is_streaming = false;
+
+        f64 grab_ms;
 
     };
 

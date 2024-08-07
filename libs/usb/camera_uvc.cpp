@@ -66,6 +66,7 @@ namespace camera_usb
         uvc::device_handle* h_device = nullptr;
         uvc::stream_ctrl ctrl;
         uvc::stream_handle* h_stream = nullptr;
+        uvc::frame_desc* p_frame_desc = nullptr;
 
         char product_id[5] = { 0 };
         char vendor_id[5] = { 0 };
@@ -224,12 +225,14 @@ namespace camera_usb
         auto& config = device.config;
 
         const uvc::format_desc* format_desc = uvc::uvc_get_format_descs(device.h_device);
-        const uvc::frame_desc* frame_desc = format_desc->frame_descs;
+        uvc::frame_desc* frame_desc = format_desc->frame_descs;
 
         if (!frame_desc) 
         { 
             return false;
         }
+
+        device.p_frame_desc = frame_desc;
 
         //format_desc->bBitsPerPixel;
 
@@ -442,7 +445,8 @@ namespace camera_usb
 
         uvc::frame* in_frame;
 
-        auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
+        //auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
+        auto res = uvc::uvc_stream_get_frame2(device.h_stream, device.p_frame_desc, &in_frame);
         if (res != uvc::UVC_SUCCESS)
         {  
             return false;
@@ -454,6 +458,8 @@ namespace camera_usb
         res = uvc::opt::mjpeg2rgba(in_frame, dst);
         
         return res == uvc::UVC_SUCCESS;
+
+        return true;
     }
 }
 
@@ -627,5 +633,5 @@ namespace camera_usb
 
 #define LIBUVC_IMPLEMENTATION
 #define LIBUVC_NUM_TRANSFER_BUFS 50
-#define LIBUVC_TRACK_MEMORY
+//#define LIBUVC_TRACK_MEMORY
 #include "libuvc3.hpp"

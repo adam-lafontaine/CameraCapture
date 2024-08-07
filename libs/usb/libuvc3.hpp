@@ -679,6 +679,9 @@ namespace uvc
         uvc_frame_t **frame);
 
 
+    uvc_error_t uvc_stream_get_frame2(uvc_stream_handle_t *strmh, uvc_frame_desc_t *frame_desc, uvc_frame_t **frame);
+
+
     uvc_error_t uvc_stream_stop(uvc_stream_handle_t *strmh);
     void uvc_stream_close(uvc_stream_handle_t *strmh);
 
@@ -3394,7 +3397,64 @@ namespace uvc
             frame->metadata_bytes = strmh->meta_hold_bytes;
             memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
         }
-    }   
+    }  
+
+
+    void _uvc_populate_frame2(uvc_stream_handle_t *strmh, uvc_frame_desc_t *frame_desc)
+    {
+        uvc_frame_t *frame = &strmh->frame;
+        
+        frame->frame_format = strmh->frame_format;
+
+        frame->width = frame_desc->wWidth;
+        frame->height = frame_desc->wHeight;
+
+        switch (frame->frame_format)
+        {
+        case UVC_FRAME_FORMAT_BGR:
+            frame->step = frame->width * 3;
+            break;
+        case UVC_FRAME_FORMAT_YUYV:
+            frame->step = frame->width * 2;
+            break;
+        case UVC_FRAME_FORMAT_NV12:
+            frame->step = frame->width;
+            break;
+        case UVC_FRAME_FORMAT_P010:
+            frame->step = frame->width * 2;
+            break;
+        case UVC_FRAME_FORMAT_MJPEG:
+            frame->step = 0;
+            break;
+        case UVC_FRAME_FORMAT_H264:
+            frame->step = 0;
+            break;
+        default:
+            frame->step = 0;
+            break;
+        }
+
+        frame->sequence = strmh->hold_seq;
+        frame->capture_time_finished = strmh->capture_time_finished;
+
+        /* copy the image data from the hold buffer to the frame (unnecessary extra buf?) */
+        if (frame->data_bytes < strmh->hold_bytes)
+        {
+            frame->data = uvc_realloc(frame->data, strmh->hold_bytes);
+        }
+        frame->data_bytes = strmh->hold_bytes;
+        memcpy(frame->data, strmh->holdbuf, frame->data_bytes);
+
+        if (strmh->meta_hold_bytes > 0)
+        {
+            if (frame->metadata_bytes < strmh->meta_hold_bytes)
+            {
+                frame->metadata = uvc_realloc(frame->metadata, strmh->meta_hold_bytes);
+            }
+            frame->metadata_bytes = strmh->meta_hold_bytes;
+            memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
+        }
+    } 
 
 
     /** Poll for a frame
@@ -3423,6 +3483,41 @@ namespace uvc
             if (strmh->last_polled_seq < strmh->hold_seq)
             {
                 _uvc_populate_frame(strmh);
+                *frame = &strmh->frame;
+                strmh->last_polled_seq = strmh->hold_seq;
+            }
+            else
+            {
+                *frame = NULL;
+            }
+        }
+        
+        mutex_unlock(strmh->cb_mutex);
+
+        return UVC_SUCCESS;
+    }
+
+
+    uvc_error_t uvc_stream_get_frame2(uvc_stream_handle_t *strmh, uvc_frame_desc_t *frame_desc, uvc_frame_t **frame)
+    {
+        if (!strmh->running)
+            return UVC_ERROR_INVALID_PARAM;
+            
+        mutex_lock(strmh->cb_mutex);
+
+        if (strmh->last_polled_seq < strmh->hold_seq)
+        {
+            _uvc_populate_frame2(strmh, frame_desc);
+            *frame = &strmh->frame;
+            strmh->last_polled_seq = strmh->hold_seq;
+        }
+        else
+        {
+            mutex_wait(strmh->cb_mutex);
+
+            if (strmh->last_polled_seq < strmh->hold_seq)
+            {
+                _uvc_populate_frame2(strmh, frame_desc);
                 *frame = &strmh->frame;
                 strmh->last_polled_seq = strmh->hold_seq;
             }
