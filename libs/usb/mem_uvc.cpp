@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <string.h>
 #include <unordered_map>
 
 
@@ -73,6 +74,29 @@ namespace mem_uvc
         realloc_count++;
         auto data = std::realloc(ptr, new_bytes);
         ptr_tags[(u64)data] = { new_bytes, tag.tag };
+
+        return data;
+    }
+
+
+    char* str_dup(cstr str, cstr tag)
+    {
+        alloc_count++;
+        char* data = 0;
+
+#ifdef _WIN32
+
+        data = _strdup(str);
+
+#else
+
+        data = strdup(str);
+
+#endif
+
+        malloc_count++;
+        auto bytes = (u32)strlen(str) + 1;
+        ptr_tags[(u64)data] = { bytes, tag };
 
         return data;
     }

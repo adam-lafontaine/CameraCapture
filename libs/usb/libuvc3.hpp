@@ -4584,41 +4584,20 @@ namespace uvc
         int bytes = libusb_get_string_descriptor_ascii(
             usb_devh, usb_desc.iSerialNumber, buf, sizeof(buf));
         
-
-#ifdef _WIN32
-
         if (bytes > 0)
-            desc_internal->serialNumber = _strdup((const char*)buf);
+            desc_internal->serialNumber = uvc_strdup((const char *)buf, "uvc serialNumber");
 
         bytes = libusb_get_string_descriptor_ascii(
             usb_devh, usb_desc.iManufacturer, buf, sizeof(buf));
 
         if (bytes > 0)
-            desc_internal->manufacturer = _strdup((const char*)buf);
+            desc_internal->manufacturer = uvc_strdup((const char *)buf, "uvc manufacturer");
 
         bytes = libusb_get_string_descriptor_ascii(
             usb_devh, usb_desc.iProduct, buf, sizeof(buf));
 
         if (bytes > 0)
-            desc_internal->product = _strdup((const char*)buf);
-#else
-        
-        if (bytes > 0)
-            desc_internal->serialNumber = strdup((const char *)buf);
-
-        bytes = libusb_get_string_descriptor_ascii(
-            usb_devh, usb_desc.iManufacturer, buf, sizeof(buf));
-
-        if (bytes > 0)
-            desc_internal->manufacturer = strdup((const char *)buf);
-
-        bytes = libusb_get_string_descriptor_ascii(
-            usb_devh, usb_desc.iProduct, buf, sizeof(buf));
-
-        if (bytes > 0)
-            desc_internal->product = strdup((const char *)buf);        
-
-#endif
+            desc_internal->product = uvc_strdup((const char *)buf, "uvc product");
 
         *desc = desc_internal;
 
@@ -4668,45 +4647,20 @@ namespace uvc
             int bytes = libusb_get_string_descriptor_ascii(
                 usb_devh, usb_desc.iSerialNumber, buf, sizeof(buf));
             
-
-#ifdef _WIN32
-
             if (bytes > 0)
-                desc_internal->serialNumber = _strdup((const char*)buf);
+                desc_internal->serialNumber = uvc_strdup((const char *)buf, "uvc serialNumber");
 
             bytes = libusb_get_string_descriptor_ascii(
                 usb_devh, usb_desc.iManufacturer, buf, sizeof(buf));
 
             if (bytes > 0)
-                desc_internal->manufacturer = _strdup((const char*)buf);
+                desc_internal->manufacturer = uvc_strdup((const char *)buf, "uvc manufacturer");
 
             bytes = libusb_get_string_descriptor_ascii(
                 usb_devh, usb_desc.iProduct, buf, sizeof(buf));
 
             if (bytes > 0)
-                desc_internal->product = _strdup((const char*)buf);
-
-#else
-            
-            if (bytes > 0)
-                desc_internal->serialNumber = strdup((const char *)buf);
-
-            bytes = libusb_get_string_descriptor_ascii(
-                usb_devh, usb_desc.iManufacturer, buf, sizeof(buf));
-
-            if (bytes > 0)
-                desc_internal->manufacturer = strdup((const char *)buf);
-
-            bytes = libusb_get_string_descriptor_ascii(
-                usb_devh, usb_desc.iProduct, buf, sizeof(buf));
-
-            if (bytes > 0)
-                desc_internal->product = strdup((const char *)buf);            
-
-#endif // _WIN32
-
-
-            
+                desc_internal->product = uvc_strdup((const char *)buf, "uvc product");
 
             libusb_close(usb_devh);
         }

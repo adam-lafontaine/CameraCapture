@@ -7,6 +7,8 @@ namespace mem_uvc
 
     void* realloc(void* ptr, u32 n_elements, u32 element_size);
 
+    char* str_dup(cstr str, cstr tag);
+
     void free(void* ptr);
 
 
@@ -57,8 +59,14 @@ namespace uvc
     }
 
 
+    inline char* uvc_strdup(cstr str, cstr tag)
+    {
+        return mem_uvc::str_dup(str, tag);
+    }
+
+
     inline void uvc_free_string(cstr str)
     {
-        std::free((void*)str);
+        mem_uvc::free((void*)str);
     }
 }
