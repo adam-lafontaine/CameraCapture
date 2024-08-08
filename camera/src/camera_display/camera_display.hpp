@@ -20,8 +20,6 @@ namespace camera_display
 
         bool is_streaming = false;
 
-        f64 grab_ms;
-
     };
 
 

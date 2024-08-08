@@ -4,6 +4,7 @@
 #include "libuvc3.hpp"
 #include "../qsprintf/qsprintf.hpp"
 #include "../util/numeric.hpp"
+#include "../util/stopwatch.hpp"
 
 #include <cassert>
 
@@ -65,6 +66,9 @@ namespace camera_usb
         
         DeviceConfigUVC config;
 
+        Stopwatch grab_sw;
+        f32 grab_ms;
+
         img::ImageView rgba;
     };
 
@@ -81,13 +85,6 @@ namespace camera_usb
 
         img::Buffer32 rgba_data;
 
-    };
-
-
-    class CameraUVC
-    {
-    public:
-        
     };
 }
 
@@ -427,8 +424,6 @@ namespace camera_usb
         res = uvc::opt::mjpeg2rgba(in_frame, dst);
         
         return res == uvc::UVC_SUCCESS;
-
-        return true;
     }
 }
 
@@ -559,6 +554,8 @@ namespace camera_usb
     {
         camera.busy = 1;
         auto& device = uvc_list.devices[camera.id];
+        
+        device.grab_sw.start();
 
         if (grab_and_convert_frame_rgba(device))
         {
@@ -568,6 +565,9 @@ namespace camera_usb
         {
             img::fill(dst, img::to_pixel(0, 0, 255));
         }
+
+        device.grab_ms = device.grab_sw.get_time_milli();
+        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
 
         camera.busy = 0;
     }
@@ -583,10 +583,13 @@ namespace camera_usb
 
         while (stream_condition())
         {
+            device.grab_sw.start();
             if (grab_and_convert_frame_rgba(device))
             {
                 on_grab(device.rgba);
             }
+            device.grab_ms = device.grab_sw.get_time_milli();
+            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
         }
 
         camera.status = c_status;
@@ -596,5 +599,5 @@ namespace camera_usb
 
 #define LIBUVC_IMPLEMENTATION
 #define LIBUVC_NUM_TRANSFER_BUFS 50
-//#define LIBUVC_TRACK_MEMORY
+#define LIBUVC_TRACK_MEMORY
 #include "libuvc3.hpp"

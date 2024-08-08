@@ -250,15 +250,11 @@ namespace camera_display
 
     static void stream_camera(CameraState& state, cam::Camera& camera)
     {
-        Stopwatch sw;
-
         auto const is_on = [&](){ return state.is_streaming; };
 
         auto const on_grab = [&](img::ImageView const& frame)
         { 
             img::copy(frame, state.display);
-            state.grab_ms = sw.get_time_milli();
-            sw.start();
         };
 
         state.is_streaming = true;
@@ -268,8 +264,7 @@ namespace camera_display
             auto& c = state.cameras.list[i];
             c.busy = 1;
         }
-
-        sw.start();
+        
         cam::stream_camera(camera, on_grab, is_on);
     }
 
@@ -341,11 +336,6 @@ namespace camera_display
     { 
         CameraCommand cmd{};
         camera_properties_table(state.cameras, cmd);  
-
-        auto ms = (f32)state.grab_ms;
-        auto fps = (int)(1000.0f / ms);
-        
-        ImGui::Text("%s | %3.1f ms | %d fps", decode_status(state.cameras.status), ms, fps);
 
         if (cmd.grab)
         {
