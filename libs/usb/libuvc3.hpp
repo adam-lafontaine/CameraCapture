@@ -495,6 +495,8 @@ namespace uvc
 
         /** Size of image data buffer */
         size_t data_bytes;
+        size_t data_capacity;
+
         /** Width of image in pixels */
         uint32_t width;
         /** Height of image in pixels */
@@ -522,6 +524,7 @@ namespace uvc
 
         /** Size of metadata buffer */
         size_t metadata_bytes;
+        size_t metadata_capacity;
     } uvc_frame_t;
     
 
@@ -3381,22 +3384,26 @@ namespace uvc
         frame->capture_time_finished = strmh->capture_time_finished;
 
         /* copy the image data from the hold buffer to the frame (unnecessary extra buf?) */
-        if (frame->data_bytes < strmh->hold_bytes)
+        if (frame->data_capacity < strmh->hold_bytes)
         {
             frame->data = uvc_realloc(frame->data, strmh->hold_bytes);
+            frame->data_capacity = strmh->hold_bytes;
         }
         frame->data_bytes = strmh->hold_bytes;
         memcpy(frame->data, strmh->holdbuf, frame->data_bytes);
 
-        if (strmh->meta_hold_bytes > 0)
+        if (!strmh->meta_hold_bytes)
         {
-            if (frame->metadata_bytes < strmh->meta_hold_bytes)
-            {
-                frame->metadata = uvc_realloc(frame->metadata, strmh->meta_hold_bytes);
-            }
-            frame->metadata_bytes = strmh->meta_hold_bytes;
-            memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
+            return;            
         }
+
+        if (frame->metadata_capacity < strmh->meta_hold_bytes)
+        {
+            frame->metadata = uvc_realloc(frame->metadata, strmh->meta_hold_bytes);
+            frame->metadata_capacity = strmh->meta_hold_bytes;
+        }
+        frame->metadata_bytes = strmh->meta_hold_bytes;
+        memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
     }  
 
 
@@ -3438,22 +3445,26 @@ namespace uvc
         frame->capture_time_finished = strmh->capture_time_finished;
 
         /* copy the image data from the hold buffer to the frame (unnecessary extra buf?) */
-        if (frame->data_bytes < strmh->hold_bytes)
+        if (frame->data_capacity < strmh->hold_bytes)
         {
             frame->data = uvc_realloc(frame->data, strmh->hold_bytes);
+            frame->data_capacity = strmh->hold_bytes;
         }
         frame->data_bytes = strmh->hold_bytes;
         memcpy(frame->data, strmh->holdbuf, frame->data_bytes);
 
-        if (strmh->meta_hold_bytes > 0)
+        if (!strmh->meta_hold_bytes)
         {
-            if (frame->metadata_bytes < strmh->meta_hold_bytes)
-            {
-                frame->metadata = uvc_realloc(frame->metadata, strmh->meta_hold_bytes);
-            }
-            frame->metadata_bytes = strmh->meta_hold_bytes;
-            memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
+            return;            
         }
+
+        if (frame->metadata_capacity < strmh->meta_hold_bytes)
+        {
+            frame->metadata = uvc_realloc(frame->metadata, strmh->meta_hold_bytes);
+            frame->metadata_capacity = strmh->meta_hold_bytes;
+        }
+        frame->metadata_bytes = strmh->meta_hold_bytes;
+        memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
     } 
 
 
@@ -8787,13 +8798,16 @@ namespace uvc
     /** @internal */
     uvc_error_t uvc_ensure_frame_size(uvc_frame_t *frame, size_t need_bytes)
     {
-        if (!frame->data || frame->data_bytes != need_bytes)
+        if (!frame->data || frame->data_capacity < need_bytes)
         {
-            frame->data_bytes = need_bytes;
-            frame->data = uvc_realloc(frame->data, frame->data_bytes);
+            frame->data = uvc_realloc(frame->data, need_bytes);
+            frame->data_capacity = need_bytes;
         }
+
         if (!frame->data)
             return UVC_ERROR_NO_MEM;
+        
+        frame->data_bytes = need_bytes;
 
         return UVC_SUCCESS;
     }
@@ -8815,7 +8829,6 @@ namespace uvc
 
         if (data_bytes > 0)
         {
-            frame->data_bytes = data_bytes;
             frame->data = uvc_malloc<uint8_t>(data_bytes, "uvc frame->data");
 
             if (!frame->data)
@@ -8823,6 +8836,9 @@ namespace uvc
                 uvc_free(frame);
                 return NULL;
             }
+
+            frame->data_capacity = data_bytes;
+            frame->data_bytes = data_bytes;
         }
 
         return frame;
@@ -8835,10 +8851,10 @@ namespace uvc
      */
     void uvc_free_frame(uvc_frame_t *frame)
     {
-        if (frame->data_bytes > 0)
+        if (frame->data || frame->data_bytes > 0)
             uvc_free(frame->data);
 
-        if (frame->metadata_bytes > 0)
+        if (frame->metadata || frame->metadata_bytes > 0)
             uvc_free(frame->metadata);
 
         uvc_free(frame);
@@ -8871,15 +8887,18 @@ namespace uvc
 
         memcpy(out->data, in->data, in->data_bytes);
 
-        if (in->metadata && in->metadata_bytes > 0)
+        if (!in->metadata || !in->metadata_bytes)
         {
-            if (out->metadata_bytes < in->metadata_bytes)
-            {
-                out->metadata = uvc_realloc(out->metadata, in->metadata_bytes);
-            }
-            out->metadata_bytes = in->metadata_bytes;
-            memcpy(out->metadata, in->metadata, in->metadata_bytes);
+            return UVC_SUCCESS;
         }
+        
+        if (out->metadata_capacity < in->metadata_bytes)
+        {
+            out->metadata = uvc_realloc(out->metadata, in->metadata_bytes);
+            out->metadata_capacity = in->metadata_bytes;
+        }
+        out->metadata_bytes = in->metadata_bytes;
+        memcpy(out->metadata, in->metadata, in->metadata_bytes);
 
         return UVC_SUCCESS;
     }
