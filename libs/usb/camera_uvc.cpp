@@ -34,17 +34,6 @@ namespace camera_usb
     constexpr u8 DEVICE_COUNT_MAX = 16;
 
 
-    enum class DeviceStatus : u8
-    {
-        Inactive = 0,
-        Active,
-        DeviceOpen,
-        StreamOpen,
-        StreamReady,
-        StreamRunning
-    };
-
-
     class DeviceConfigUVC
     {
     public:
@@ -75,8 +64,6 @@ namespace camera_usb
         char label[32] = { 0 };
         
         DeviceConfigUVC config;
-
-        DeviceStatus status = DeviceStatus::Inactive;
 
         img::ImageView rgba;
     };
@@ -334,8 +321,6 @@ namespace camera_usb
 
             read_device_properties(device);
 
-            device.status = DeviceStatus::Active;
-
             ++list.count;
 
             max_pixels = num::max(max_pixels, device.config.frame_width * device.config.frame_height);
@@ -359,8 +344,6 @@ namespace camera_usb
             close_device(device);
             uvc::uvc_unref_device(device.p_device);
             device.p_device = nullptr;
-
-            device.status = DeviceStatus::Inactive;
         }
 
         if (list.device_list)
@@ -401,9 +384,7 @@ namespace camera_usb
         {
             assert(false && "Could not open stream");
             return false;
-        }        
-
-        device.status = DeviceStatus::StreamOpen;
+        }
 
         return true;
     }
@@ -419,8 +400,6 @@ namespace camera_usb
 
         enable_exposure_mode(device);
 
-        device.status = DeviceStatus::StreamReady;
-
         return true;
     }
 
@@ -428,21 +407,11 @@ namespace camera_usb
     static void close_device_stream(DeviceUVC& device)
     {
         close_stream(device);
-
-        if (device.status > DeviceStatus::DeviceOpen)
-        {
-            device.status = DeviceStatus::DeviceOpen;
-        }
     }
 
 
     static bool grab_and_convert_frame_rgba(DeviceUVC& device)
     {
-        if (device.status < DeviceStatus::StreamReady)
-        {
-            return false;
-        }
-
         uvc::frame* in_frame;
 
         //auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
@@ -609,12 +578,10 @@ namespace camera_usb
         auto& device = uvc_list.devices[camera.id];
 
         auto c_status = camera.status;
-        auto d_status = device.status;
 
         camera.status = CameraStatus::Streaming;
-        device.status = DeviceStatus::StreamRunning;
 
-        while (stream_condition() && device.status == DeviceStatus::StreamRunning)
+        while (stream_condition())
         {
             if (grab_and_convert_frame_rgba(device))
             {
@@ -622,11 +589,7 @@ namespace camera_usb
             }
         }
 
-        if (device.status != DeviceStatus::Inactive)
-        {
-            camera.status = c_status;
-            device.status = d_status;
-        }
+        camera.status = c_status;
     }
 }
 
