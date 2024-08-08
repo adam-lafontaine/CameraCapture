@@ -335,6 +335,7 @@ namespace camera_display
     void show_cameras(CameraState& state)
     { 
         CameraCommand cmd{};
+        
         camera_properties_table(state.cameras, cmd);  
 
         if (cmd.grab)

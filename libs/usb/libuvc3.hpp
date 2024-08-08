@@ -2894,6 +2894,7 @@ namespace uvc
                     _uvc_process_payload(strmh, pktbuf, pkt->actual_length);
                 }
             }
+            
             break;
         case LIBUSB_TRANSFER_CANCELLED:
         case LIBUSB_TRANSFER_ERROR:
@@ -3223,35 +3224,33 @@ namespace uvc
                         libusb_free_ss_endpoint_companion_descriptor(ep_comp);
                         break;
                     }
-                    else
+                    else if (endpoint->bEndpointAddress == format_desc->parent->bEndpointAddress)
                     {
-                        if (endpoint->bEndpointAddress == format_desc->parent->bEndpointAddress)
-                        {
-                            endpoint_bytes_per_packet = endpoint->wMaxPacketSize;
-                            // wMaxPacketSize: [unused:2 (multiplier-1):3 size:11]
-                            endpoint_bytes_per_packet = (endpoint_bytes_per_packet & 0x07ff) *
-                                                        (((endpoint_bytes_per_packet >> 11) & 3) + 1);
-                            break;
-                        }
+                        endpoint_bytes_per_packet = endpoint->wMaxPacketSize;
+                        // wMaxPacketSize: [unused:2 (multiplier-1):3 size:11]
+                        endpoint_bytes_per_packet = (endpoint_bytes_per_packet & 0x07ff) *
+                                                    (((endpoint_bytes_per_packet >> 11) & 3) + 1);
+                        break;                        
                     }
                 }
 
                 if (endpoint_bytes_per_packet >= config_bytes_per_packet)
-                {
-                    /* Transfers will be at most one frame long: Divide the maximum frame size
-                     * by the size of the endpoint and round up */
-                    packets_per_transfer = (ctrl->dwMaxVideoFrameSize +
-                                            endpoint_bytes_per_packet - 1) /
-                                           endpoint_bytes_per_packet;
-
-                    /* But keep a reasonable limit: Otherwise we start dropping data */
-                    if (packets_per_transfer > 32)
-                        packets_per_transfer = 32;
-
-                    total_transfer_size = packets_per_transfer * endpoint_bytes_per_packet;
+                {                    
                     break;
                 }
             }
+
+            /* Transfers will be at most one frame long: Divide the maximum frame size
+            * by the size of the endpoint and round up */
+            packets_per_transfer = (ctrl->dwMaxVideoFrameSize +
+                                    endpoint_bytes_per_packet - 1) /
+                                    endpoint_bytes_per_packet;
+
+            /* But keep a reasonable limit: Otherwise we start dropping data */
+            if (packets_per_transfer > 32)
+                packets_per_transfer = 32;
+
+            total_transfer_size = packets_per_transfer * endpoint_bytes_per_packet;
 
             /* If we searched through all the altsettings and found nothing usable */
             if (alt_idx == interface->num_altsetting)
@@ -3407,67 +3406,6 @@ namespace uvc
     }  
 
 
-    void _uvc_populate_frame2(uvc_stream_handle_t *strmh, uvc_frame_desc_t *frame_desc)
-    {
-        uvc_frame_t *frame = &strmh->frame;
-        
-        frame->frame_format = strmh->frame_format;
-
-        frame->width = frame_desc->wWidth;
-        frame->height = frame_desc->wHeight;
-
-        switch (frame->frame_format)
-        {
-        case UVC_FRAME_FORMAT_BGR:
-            frame->step = frame->width * 3;
-            break;
-        case UVC_FRAME_FORMAT_YUYV:
-            frame->step = frame->width * 2;
-            break;
-        case UVC_FRAME_FORMAT_NV12:
-            frame->step = frame->width;
-            break;
-        case UVC_FRAME_FORMAT_P010:
-            frame->step = frame->width * 2;
-            break;
-        case UVC_FRAME_FORMAT_MJPEG:
-            frame->step = 0;
-            break;
-        case UVC_FRAME_FORMAT_H264:
-            frame->step = 0;
-            break;
-        default:
-            frame->step = 0;
-            break;
-        }
-
-        frame->sequence = strmh->hold_seq;
-        frame->capture_time_finished = strmh->capture_time_finished;
-
-        /* copy the image data from the hold buffer to the frame (unnecessary extra buf?) */
-        if (frame->data_capacity < strmh->hold_bytes)
-        {
-            frame->data = uvc_realloc(frame->data, strmh->hold_bytes);
-            frame->data_capacity = strmh->hold_bytes;
-        }
-        frame->data_bytes = strmh->hold_bytes;
-        memcpy(frame->data, strmh->holdbuf, frame->data_bytes);
-
-        if (!strmh->meta_hold_bytes)
-        {
-            return;            
-        }
-
-        if (frame->metadata_capacity < strmh->meta_hold_bytes)
-        {
-            frame->metadata = uvc_realloc(frame->metadata, strmh->meta_hold_bytes);
-            frame->metadata_capacity = strmh->meta_hold_bytes;
-        }
-        frame->metadata_bytes = strmh->meta_hold_bytes;
-        memcpy(frame->metadata, strmh->meta_holdbuf, frame->metadata_bytes);
-    } 
-
-
     /** Poll for a frame
      * @ingroup streaming
      *
@@ -3494,41 +3432,6 @@ namespace uvc
             if (strmh->last_polled_seq < strmh->hold_seq)
             {
                 _uvc_populate_frame(strmh);
-                *frame = &strmh->frame;
-                strmh->last_polled_seq = strmh->hold_seq;
-            }
-            else
-            {
-                *frame = NULL;
-            }
-        }
-        
-        mutex_unlock(strmh->cb_mutex);
-
-        return UVC_SUCCESS;
-    }
-
-
-    uvc_error_t uvc_stream_get_frame2(uvc_stream_handle_t *strmh, uvc_frame_desc_t *frame_desc, uvc_frame_t **frame)
-    {
-        if (!strmh->running)
-            return UVC_ERROR_INVALID_PARAM;
-            
-        mutex_lock(strmh->cb_mutex);
-
-        if (strmh->last_polled_seq < strmh->hold_seq)
-        {
-            _uvc_populate_frame2(strmh, frame_desc);
-            *frame = &strmh->frame;
-            strmh->last_polled_seq = strmh->hold_seq;
-        }
-        else
-        {
-            mutex_wait(strmh->cb_mutex);
-
-            if (strmh->last_polled_seq < strmh->hold_seq)
-            {
-                _uvc_populate_frame2(strmh, frame_desc);
                 *frame = &strmh->frame;
                 strmh->last_polled_seq = strmh->hold_seq;
             }

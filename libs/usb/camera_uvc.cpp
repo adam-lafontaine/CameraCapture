@@ -411,8 +411,7 @@ namespace camera_usb
     {
         uvc::frame* in_frame;
 
-        //auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
-        auto res = uvc::uvc_stream_get_frame2(device.h_stream, device.p_frame_desc, &in_frame);
+        auto res = uvc::uvc_stream_get_frame(device.h_stream, &in_frame);
         if (res != uvc::UVC_SUCCESS)
         {  
             return false;
