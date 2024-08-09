@@ -252,7 +252,10 @@ namespace camera_display
     {
         auto const is_on = [&](){ return state.is_streaming; };
 
-        auto const on_grab = [&](img::ImageView const& frame){ img::copy(frame, state.display); };
+        auto const on_grab = [&](img::ImageView const& frame)
+        { 
+            img::copy(frame, state.display);
+        };
 
         state.is_streaming = true;
 
@@ -261,7 +264,7 @@ namespace camera_display
             auto& c = state.cameras.list[i];
             c.busy = 1;
         }
-
+        
         cam::stream_camera(camera, on_grab, is_on);
     }
 
@@ -332,9 +335,8 @@ namespace camera_display
     void show_cameras(CameraState& state)
     { 
         CameraCommand cmd{};
-        camera_properties_table(state.cameras, cmd);
         
-        ImGui::Text("%s", decode_status(state.cameras.status));
+        camera_properties_table(state.cameras, cmd);  
 
         if (cmd.grab)
         {

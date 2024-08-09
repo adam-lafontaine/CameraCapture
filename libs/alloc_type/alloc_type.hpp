@@ -3,12 +3,14 @@
 #include "../util/types.hpp"
 
 
-//#define ALLOC_NO_COUNT
+//#define ALLOC_COUNT
 
 
 namespace mem
 {    
     void* malloc_memory(u32 n_elements, u32 element_size, cstr tag);
+
+    void* realloc_memory(void* ptr, u32 n_elements, u32 element_size);
 
     void free_memory(void* ptr, u32 element_size);    
 
@@ -40,6 +42,13 @@ namespace mem
     inline T* malloc(cstr tag)
     {
         return malloc<T>(1, tag);
+    }
+
+
+    template <typename T>
+    inline T* realloc(T* ptr, u32 n_elements)
+    {
+        return (T*)realloc_memory((void*)ptr, n_elements, (u32)sizeof(T));
     }
 
 

@@ -8,9 +8,6 @@ namespace cam = camera_usb;
 
 namespace camera_display
 {
-    
-
-
     class CameraState
     {
     public:

@@ -2,6 +2,19 @@
 
 #include "../../../libs/imgui/imgui.h"
 
+//#define ALLOC_COUNT
+
+#ifndef ALLOC_COUNT
+
+namespace diagnostics
+{
+    void show_memory(){}
+
+    void show_uvc_memory(){}
+}
+
+#else
+
 
 /* memory */
 
@@ -16,29 +29,50 @@ namespace diagnostics
     }
 
 
-    static void bytes_text(auto bytes)
+    class ValueSuffix
     {
-        auto suffix = "B";
+    public:
+        f32 value = 0.0f;
+        char suffix = 'B';
+    };
+
+
+    static ValueSuffix bytes_suffix(auto bytes)
+    {
+        ValueSuffix vs{};
+
+        auto suffix = 'B';
         auto num = (f32)bytes;
 
         if (num >= 1'000'000'000.0f)
         {
             num /= 1'000'000'000.0f;
-            suffix = "G";
+            suffix = 'G';
         }
         else if (num >= 1'000'000.0f)
         {
             num /= 1'000'000.0f;
-            suffix = "M";            
+            suffix = 'M';            
         }
         else if (num >= 1'000.0f)
         {
             num /= 1'000.0f;
-            suffix = "K";
+            suffix = 'K';
         }
 
+        vs.value = num;
+        vs.suffix = suffix;
+
+        return vs;
+    }
+
+
+    static void bytes_text(auto bytes)
+    {
+        auto vs = bytes_suffix(bytes);
+
         char text[32] = { 0 };
-        qsnprintf(text, 32, "%5.1f %s", num, suffix);
+        qsnprintf(text, 32, "%5.1f %c", vs.value, vs.suffix);
 
         ImGui::Text("%s", text);
     }
@@ -268,8 +302,14 @@ namespace diagnostics
 
         ImGui::EndTable();
     }
+}
 
 
+#include "../../../libs/usb/mem_uvc.hpp"
+
+
+namespace diagnostics
+{
     void show_memory()
     {
         if (!ImGui::CollapsingHeader("Memory"))
@@ -281,4 +321,25 @@ namespace diagnostics
         alloc_history_table();
     }
 
+
+    void show_uvc_memory()
+    {
+        if (!ImGui::CollapsingHeader("UVC"))
+        {
+            return;
+        }
+
+        auto stats = mem_uvc::get_stats();
+
+        ImGui::Text("# Allocations: %u", stats.count);
+
+        auto vs = bytes_suffix(stats.bytes);
+        ImGui::Text("Total bytes: %u (%3.1f %c)", stats.bytes, vs.value, vs.suffix);
+
+        ImGui::Text(" malloc: %u", stats.malloc);
+        ImGui::Text("realloc: %u", stats.realloc);
+        ImGui::Text("   free: %u", stats.free);
+    }
 }
+
+#endif

@@ -4,6 +4,7 @@
 #include "libuvc3.hpp"
 #include "../qsprintf/qsprintf.hpp"
 #include "../util/numeric.hpp"
+#include "../util/stopwatch.hpp"
 
 #include <cassert>
 
@@ -34,17 +35,6 @@ namespace camera_usb
     constexpr u8 DEVICE_COUNT_MAX = 16;
 
 
-    enum class DeviceStatus : u8
-    {
-        Inactive = 0,
-        Active,
-        DeviceOpen,
-        StreamOpen,
-        StreamReady,
-        StreamRunning
-    };
-
-
     class DeviceConfigUVC
     {
     public:
@@ -66,6 +56,7 @@ namespace camera_usb
         uvc::device_handle* h_device = nullptr;
         uvc::stream_ctrl ctrl;
         uvc::stream_handle* h_stream = nullptr;
+        uvc::frame_desc* p_frame_desc = nullptr;
 
         char product_id[5] = { 0 };
         char vendor_id[5] = { 0 };
@@ -75,7 +66,8 @@ namespace camera_usb
         
         DeviceConfigUVC config;
 
-        DeviceStatus status = DeviceStatus::Inactive;
+        Stopwatch grab_sw;
+        f32 grab_ms;
 
         img::ImageView rgba;
     };
@@ -93,13 +85,6 @@ namespace camera_usb
 
         img::Buffer32 rgba_data;
 
-    };
-
-
-    class CameraUVC
-    {
-    public:
-        
     };
 }
 
@@ -224,12 +209,14 @@ namespace camera_usb
         auto& config = device.config;
 
         const uvc::format_desc* format_desc = uvc::uvc_get_format_descs(device.h_device);
-        const uvc::frame_desc* frame_desc = format_desc->frame_descs;
+        uvc::frame_desc* frame_desc = format_desc->frame_descs;
 
         if (!frame_desc) 
         { 
             return false;
         }
+
+        device.p_frame_desc = frame_desc;
 
         //format_desc->bBitsPerPixel;
 
@@ -331,8 +318,6 @@ namespace camera_usb
 
             read_device_properties(device);
 
-            device.status = DeviceStatus::Active;
-
             ++list.count;
 
             max_pixels = num::max(max_pixels, device.config.frame_width * device.config.frame_height);
@@ -356,8 +341,6 @@ namespace camera_usb
             close_device(device);
             uvc::uvc_unref_device(device.p_device);
             device.p_device = nullptr;
-
-            device.status = DeviceStatus::Inactive;
         }
 
         if (list.device_list)
@@ -398,9 +381,7 @@ namespace camera_usb
         {
             assert(false && "Could not open stream");
             return false;
-        }        
-
-        device.status = DeviceStatus::StreamOpen;
+        }
 
         return true;
     }
@@ -416,8 +397,6 @@ namespace camera_usb
 
         enable_exposure_mode(device);
 
-        device.status = DeviceStatus::StreamReady;
-
         return true;
     }
 
@@ -425,11 +404,6 @@ namespace camera_usb
     static void close_device_stream(DeviceUVC& device)
     {
         close_stream(device);
-
-        if (device.status > DeviceStatus::DeviceOpen)
-        {
-            device.status = DeviceStatus::DeviceOpen;
-        }
     }
 
 
@@ -579,6 +553,8 @@ namespace camera_usb
     {
         camera.busy = 1;
         auto& device = uvc_list.devices[camera.id];
+        
+        device.grab_sw.start();
 
         if (grab_and_convert_frame_rgba(device))
         {
@@ -589,6 +565,9 @@ namespace camera_usb
             img::fill(dst, img::to_pixel(0, 0, 255));
         }
 
+        device.grab_ms = device.grab_sw.get_time_milli();
+        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+
         camera.busy = 0;
     }
 
@@ -597,22 +576,27 @@ namespace camera_usb
     {
         auto& device = uvc_list.devices[camera.id];
 
-        auto status = camera.status;
+        auto c_status = camera.status;
 
         camera.status = CameraStatus::Streaming;
 
         while (stream_condition())
         {
+            device.grab_sw.start();
             if (grab_and_convert_frame_rgba(device))
             {
                 on_grab(device.rgba);
             }
+            device.grab_ms = device.grab_sw.get_time_milli();
+            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
         }
 
-        camera.status = status;
+        camera.status = c_status;
     }
 }
 
 
 #define LIBUVC_IMPLEMENTATION
+#define LIBUVC_NUM_TRANSFER_BUFS 50
+#define LIBUVC_TRACK_MEMORY
 #include "libuvc3.hpp"
