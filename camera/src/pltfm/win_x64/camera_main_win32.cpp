@@ -1,0 +1,1 @@
+#include "../ubuntu_x64/camera_main.cpp"
