@@ -179,7 +179,12 @@ sdl_input_c += $(numeric_h)
 
 #*** usb ***
 
-camera_usb_c := 
+camera_usb_h := $(usb)/camera_usb.hpp
+mjpeg_convert_h := $(usb)/mjpeg_convert.hpp
+
+camera_usb_c := $(usb)/camera_win.cpp
+camera_usb_c += $(camera_usb_h)
+camera_usb_c += $(mjpeg_convert_h)
 
 #**********
 
