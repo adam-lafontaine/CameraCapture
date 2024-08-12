@@ -1,10 +1,10 @@
-CPP := g++
+GPP := g++
 
-CPPFLAGS := -std=c++20
-CPPFLAGS += -mavx
-#CPPFLAGS += -O3
-#CPPFLAGS += -DNDEBUG
-CPPFLAGS += -mwindows
+GPP += -std=c++20
+GPP += -mavx
+#GPP += -O3
+#GPP += -DNDEBUG
+GPP += -mwindows
 
 #GPP += -DIMAGE_READ
 #GPP += -DIMAGE_WRITE
@@ -14,15 +14,21 @@ SDL := C:\SDL2\SDL2-2.30.5\x86_64-w64-mingw32
 SDL_DLL := $(SDL)/bin/SDL2.dll
 ISDL := -I$(SDL)\include -I$(SDL)\include\SDL2
 
-IFLAGS := $(ISDL)
+VCPKG := C:\D_Data\vcpkg\installed\x64-windows\include
+
+IVCPKG := -I$(VCPKG)
+
+IOGL := -I$(VCPKG)/GL
+
+IFLAGS := $(ISDL) $(IVCPKG) $(IOGL)
 
 LDSDL := -L$(SDL)\lib
 LSDL  := $(LDSDL) -lSDL2
 
-LDOGL := $(LDOGL)
-LOGL  := -lGL -ldl
+LDOGL := 
+LOGL  := $(LDOGL)
 
-LUSB :=
+LUSB := -lmf -lmfplat -lmfreadwrite -lmfuuid -lShlwapi
 
 ALL_LFLAGS := $(LSDL) $(LOGL) $(LUSB)
 
@@ -33,7 +39,8 @@ camera := $(root)/camera
 build  := $(camera)/build/win
 src    := $(camera)/src
 
-pltfm := $(src)/pltfm/ubuntu_x64
+pltfm := $(src)/pltfm/win_x64
+sdl_ogl := $(src)/pltfm/sdl_ogl_main
 
 libs := $(root)/libs
 
@@ -233,11 +240,12 @@ camera_display_c := $(camera_display)/camera_display.cpp
 
 #*** main cpp ***
 
-main_c := $(pltfm)/camera_main.cpp
+main_c := $(pltfm)/camera_main_win32.cpp
 main_o := $(build)/main.o
 obj    := $(main_o)
 
-main_dep := $(imgui_include_h)
+main_dep := $(sdl_ogl)/camera_main.cpp
+main_dep += $(imgui_include_h)
 main_dep += $(sdl_include_h)
 main_dep += $(stopwatch_h)
 main_dep += $(alloc_type_c)
@@ -273,19 +281,19 @@ imgui_dep := $(imgui_options_h)
 
 
 $(main_o): $(main_c) $(main_dep)
-	@echo "\n  main"
-	$(GPP) -o $@ -c $< $(ALL_LFLAGS)
+	@echo "  main"
+	$(GPP) $(IFLAGS) -o $@ -c $< $(ALL_LFLAGS)
 
 
 $(imgui_o): $(imgui_c) $(imgui_dep)
-	@echo "\n  imgui"
-	$(GPP) -o $@ -c $< $(SDL2) $(OPENGL)
+	@echo "  imgui"
+	$(GPP) $(IFLAGS) -o $@ -c $< $(SDL2) $(OPENGL)
 
 #**************
 
 
 $(program_exe): $(obj)
-	@echo "\n  program_exe"
+	@echo "  program_exe"
 	$(GPP) -o $@ $+ $(ALL_LFLAGS)
 
 

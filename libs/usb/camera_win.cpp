@@ -1,4 +1,10 @@
+#pragma once
+
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
+
+
 #include <Windows.h>
 #include <mfapi.h>
 #include <mfidl.h>
@@ -430,17 +436,42 @@ namespace w32
 #include "mjpeg_convert.hpp"
 
 
+/* api */
+
 namespace camera_usb
 {
-    CameraList enumerate_cameras();
+    CameraList enumerate_cameras()
+    {
+        CameraList list{};
+        list.status = ConnectionStatus::Disconnected;
 
-    void close(CameraList& cameras);
 
-    bool open_camera(Camera& camera);
+        return list;
+    }
 
-    void grab_image(Camera& camera, img::ImageView const& dst);
 
-    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition);
+    void close(CameraList& cameras)
+    {
+
+    }
+
+
+    bool open_camera(Camera& camera)
+    {
+        return false;
+    }
+
+
+    void grab_image(Camera& camera, img::ImageView const& dst)
+    {
+
+    }
+
+
+    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition)
+    {
+
+    }
 }
 
 
