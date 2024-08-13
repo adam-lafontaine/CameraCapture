@@ -10,21 +10,29 @@ GPP += -mwindows
 #GPP += -DIMAGE_WRITE
 #GPP += -DALLOC_COUNT
 
+
+# directories
 SDL := C:\SDL2\SDL2-2.30.5\x86_64-w64-mingw32
-ISDL := -I$(SDL)\include -I$(SDL)\include\SDL2
-
-LDSDL := -L$(SDL)\lib
-
 VCPKG := C:\D_Data\vcpkg\installed\x64-windows
+
+# include directory flags
+ISDL := -I$(SDL)\include -I$(SDL)\include\SDL2
 IVCPKG := -I$(VCPKG)/include
 
+# link directory flags
+LDSDL := -L$(SDL)\lib
 LDVCPKG := -L$(VCPKG)/lib
 
+# dll files
+SDL_DLL := $(SDL)/bin/SDL2.dll
+JPEG_DLL := $(VCPKG)/bin/jpeg62.dll
+
+
+# flags
 IFLAGS := $(ISDL) $(IVCPKG)
 
 LDX11 := -limm32 -ld3d11 -ld3dcompiler -ldxgi
 LSDL  := $(LDSDL) -lmingw32 -lsdl2 -lSDL2main -lopengl32 -lgdi32
-
 LUSB := $(LDVCPKG) -lmf -lmfplat -lmfreadwrite -lmfuuid -lShlwapi -ljpeg
 
 ALL_LFLAGS :=  $(LSDL) $(LDX11) $(LUSB)
@@ -290,6 +298,8 @@ $(imgui_o): $(imgui_c) $(imgui_dep)
 $(program_exe): $(obj)
 	@echo "  program_exe"
 	$(GPP) -o $@ $+ $(ALL_LFLAGS)
+	cp $(SDL_DLL) $(build)
+	cp $(JPEG_DLL) $(build)
 
 
 build: $(program_exe)
