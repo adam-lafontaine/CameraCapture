@@ -178,6 +178,9 @@ namespace ogl
     }
 
 
+
+    // https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
+
     struct TextureId { int value = -1; };
 
 

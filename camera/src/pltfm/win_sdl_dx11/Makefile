@@ -44,7 +44,7 @@ camera := $(root)/camera
 build  := $(camera)/build/win
 src    := $(camera)/src
 
-pltfm := $(src)/pltfm/win_x64
+pltfm := $(src)/pltfm/win_sdl_dx11
 
 libs := $(root)/libs
 

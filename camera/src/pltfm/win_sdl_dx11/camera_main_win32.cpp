@@ -6,19 +6,9 @@
 #include "../../../../libs/util/stopwatch.hpp"
 
 
-#include <thread>
-
-
 namespace img = image;
 namespace idsp = input_display;
 namespace cdsp = camera_display;
-
-
-constexpr f64 NANO = 1'000'000'000;
-constexpr f64 MICRO = 1'000'000;
-
-constexpr f64 TARGET_FRAMERATE_HZ = 60.0;
-constexpr f64 TARGET_NS_PER_FRAME = NANO / TARGET_FRAMERATE_HZ;
 
 
 
@@ -175,21 +165,6 @@ static void swap_inputs()
     auto& input_prev = user_input[input_id_prev];
 
     input::copy_input(input_prev, input);
-}
-
-
-static void wait_for_framerate()
-{
-    constexpr f64 fudge = 0.9;
-
-    main_frame_ns = main_sw.get_time_nano();
-    auto sleep_ns = TARGET_NS_PER_FRAME - main_frame_ns;
-    if (sleep_ns > 0.0)
-    {
-        std::this_thread::sleep_for(std::chrono::nanoseconds((i64)(sleep_ns * fudge)));
-    }
-
-    main_sw.start();
 }
 
 
@@ -461,10 +436,7 @@ static void main_loop()
 
         render_camera(camera_state.display);
 
-        render_imgui_frame();        
-
-        // cap frame rate
-        wait_for_framerate();
+        render_imgui_frame(); 
     }
 }
 
