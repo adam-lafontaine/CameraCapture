@@ -14,6 +14,13 @@
 #include <SDL2/SDL_syswm.h>
 
 
+// Data
+static ID3D11Device*            g_pd3dDevice = nullptr;
+static ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
+static IDXGISwapChain*          g_pSwapChain = nullptr;
+static ID3D11RenderTargetView*  g_mainRenderTargetView = nullptr;
+
+
 namespace ui
 {
     class UIState
@@ -141,5 +148,89 @@ namespace dx11
 {
     // https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
 
+    struct TextureId { int value = -1; };
+
     
+    class Texture
+    {
+    public:
+        D3D11_TEXTURE2D_DESC desc;
+        ID3D11Texture2D *pTexture = 0;
+        ID3D11ShaderResourceView* srv;
+    };
+
+    template <size_t N>
+    class TextureList
+    {
+    public:
+        static constexpr size_t count = N;
+
+        Texture data[count] = { 0 };
+
+        Texture& get(TextureId id) { return data[id.value]; }
+    };
+
+
+    template <size_t N>
+    static inline TextureList<N> create_textures()
+    {
+        TextureList<N> textures{};
+
+        for (int i = 0; i < textures.count; i++)
+        {
+
+        }
+
+        return textures;
+    }
+
+
+    template <typename P>
+    static inline void init_texture(P* data, UINT width, UINT height, Texture& texture)
+    {
+        static_assert(sizeof(P) == 4);
+
+        auto& desc = texture.desc;
+        auto& pTexture = texture.pTexture;
+        auto& srv = texture.srv;
+
+        ZeroMemory(&desc, sizeof(desc));
+        desc.Width = width;
+        desc.Height = height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        desc.CPUAccessFlags = 0;        
+
+        D3D11_SUBRESOURCE_DATA subResource;
+        subResource.pSysMem = (void*)data;
+        subResource.SysMemPitch = desc.Width * 4;
+        subResource.SysMemSlicePitch = 0;
+        g_pd3dDevice->CreateTexture2D(&desc, &subResource, &pTexture);
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+        ZeroMemory(&srvDesc, sizeof(srvDesc));
+        srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = desc.MipLevels;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+        g_pd3dDevice->CreateShaderResourceView(pTexture, &srvDesc, &srv);
+        //pTexture->Release();
+        //pTexture = 0;
+
+        g_pd3dDeviceContext->PSSetShaderResources(0, 1, &srv);
+    }
+
+
+    template <typename P>
+    static inline void render_to_texture(P* data, UINT width, UINT height, Texture& texture)
+    {
+        g_pd3dDeviceContext->UpdateSubresource(texture.pTexture, 0, 0, (void*)data, width * 4, 0);
+        g_pd3dDeviceContext->PSSetShaderResources(0, 1, &texture.srv);
+    }
+
+
 }

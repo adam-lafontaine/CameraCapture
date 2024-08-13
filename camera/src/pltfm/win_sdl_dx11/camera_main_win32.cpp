@@ -44,30 +44,30 @@ static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, inpu
 }
 
 
-/*static void ui_input_window(GLuint texture, u32 width, u32 height, f32 scale)
+static void ui_input_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
     ImGui::Begin("Input");
 
-    ImGui::Image((void*)(intptr_t)texture, ImVec2(w, h));
+    ImGui::Image((void*)texture.srv, ImVec2(w, h));
 
     ImGui::End();
 }
 
 
-static void ui_camera_window(GLuint texture, u32 width, u32 height, f32 scale)
+static void ui_camera_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
     ImGui::Begin("Camera");
 
-    ImGui::Image((void*)(intptr_t)texture, ImVec2(w, h));
+    ImGui::Image((void*)texture.srv, ImVec2(w, h));
 
     ImGui::End();
-}*/
+}
 
 
 static void ui_camera_controls_window(cdsp::CameraState& state)
@@ -113,6 +113,11 @@ namespace
 
     img::Buffer32 camera_buffer;
 
+    constexpr u32 N_TEXTURES = 2;
+    constexpr dx11::TextureId input_texture_id = { 0 };
+    constexpr dx11::TextureId camera_texture_id = { 1 };
+    dx11::TextureList<N_TEXTURES> textures;
+
     ui::UIState ui_state{};
     SDL_Window* window = 0;
     
@@ -123,11 +128,7 @@ namespace
 }
 
 
-// Data
-static ID3D11Device*            g_pd3dDevice = nullptr;
-static ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
-static IDXGISwapChain*          g_pSwapChain = nullptr;
-static ID3D11RenderTargetView*  g_mainRenderTargetView = nullptr;
+
 
 // Forward declarations of helper functions
 bool CreateDeviceD3D(HWND hWnd);
@@ -285,8 +286,8 @@ static void render_imgui_frame()
     ui::show_imgui_demo(ui_state);
 #endif
 
-    //ui_input_window(textures.data[input_texture_id.value], io_state.display.width, io_state.display.height, 2.0f);
-    //ui_camera_window(textures.data[camera_texture_id.value], camera_state.display.width, camera_state.display.height, 1.0f);
+    ui_input_window(textures.get(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
+    ui_camera_window(textures.get(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
     ui_camera_controls_window(camera_state);
 
     ui_diagnostics_window();
@@ -307,13 +308,13 @@ static void render_imgui_frame()
 
 static void render_input_display(img::ImageView const& src)
 {
-
+    dx11::render_to_texture(src.matrix_data_, src.width, src.height, textures.get(input_texture_id));
 }
 
 
 static void render_camera(img::ImageView const& src)
 {
-
+    dx11::render_to_texture(src.matrix_data_, src.width, src.height, textures.get(camera_texture_id));
 }
 
 
@@ -393,7 +394,15 @@ static bool main_init()
     camera_state.display = img::make_view(w, h, camera_buffer);
     img::fill(camera_state.display, img::to_pixel(128));
 
-    cdsp::init_async(camera_state);
+    cdsp::init_async(camera_state);    
+
+    textures = dx11::create_textures<N_TEXTURES>();
+
+    auto& io_display = io_state.display;
+    dx11::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
+    
+    auto& camera_display = camera_state.display;
+    dx11::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
 
     return true;
 }

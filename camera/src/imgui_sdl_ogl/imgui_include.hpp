@@ -183,6 +183,8 @@ namespace ogl
 
     struct TextureId { int value = -1; };
 
+    using Texture = GLuint;
+
 
     template <size_t N>
     class TextureList
@@ -190,7 +192,9 @@ namespace ogl
     public:
         static constexpr size_t count = N;
 
-        GLuint data[count] = { 0 };
+        Texture data[count] = { 0 };
+
+        Texture& get(TextureId id) { return data[id.value]; }
     };
 
 
