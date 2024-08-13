@@ -8,29 +8,26 @@ GPP += -mwindows
 
 #GPP += -DIMAGE_READ
 #GPP += -DIMAGE_WRITE
-GPP += -DALLOC_COUNT
+#GPP += -DALLOC_COUNT
 
 SDL := C:\SDL2\SDL2-2.30.5\x86_64-w64-mingw32
-SDL_DLL := $(SDL)/bin/SDL2.dll
 ISDL := -I$(SDL)\include -I$(SDL)\include\SDL2
 
-VCPKG := C:\D_Data\vcpkg\installed\x64-windows\include
-
-IVCPKG := -I$(VCPKG)
-
-IOGL := -I$(VCPKG)/GL
-
-IFLAGS := $(ISDL) $(IVCPKG) $(IOGL)
-
 LDSDL := -L$(SDL)\lib
-LSDL  := $(LDSDL) -lSDL2
 
-LDOGL := 
-LOGL  := $(LDOGL)
+VCPKG := C:\D_Data\vcpkg\installed\x64-windows
+IVCPKG := -I$(VCPKG)/include
 
-LUSB := -lmf -lmfplat -lmfreadwrite -lmfuuid -lShlwapi
+LDVCPKG := -L$(VCPKG)/lib
 
-ALL_LFLAGS := $(LSDL) $(LOGL) $(LUSB)
+IFLAGS := $(ISDL) $(IVCPKG)
+
+LDX11 := -limm32 -ld3d11 -ld3dcompiler -ldxgi
+LSDL  := $(LDSDL) -lmingw32 -lsdl2 -lSDL2main -lopengl32 -lgdi32
+
+LUSB := $(LDVCPKG) -lmf -lmfplat -lmfreadwrite -lmfuuid -lShlwapi -ljpeg
+
+ALL_LFLAGS :=  $(LSDL) $(LDX11) $(LUSB)
 
 
 root       := ../../../..
@@ -40,7 +37,6 @@ build  := $(camera)/build/win
 src    := $(camera)/src
 
 pltfm := $(src)/pltfm/win_x64
-sdl_ogl := $(src)/pltfm/sdl_ogl_main
 
 libs := $(root)/libs
 
@@ -67,7 +63,7 @@ sdl        := $(libs)/sdl
 
 #*** imgui ***
 
-imgui := $(src)/imgui_sdl_ogl
+imgui := $(pltfm)
 imgui_options_h := $(imgui)/imgui_options.hpp
 
 imgui_include_h := $(imgui)/imgui_include.hpp
@@ -244,8 +240,8 @@ main_c := $(pltfm)/camera_main_win32.cpp
 main_o := $(build)/main.o
 obj    := $(main_o)
 
-main_dep := $(sdl_ogl)/camera_main.cpp
-main_dep += $(imgui_include_h)
+
+main_dep := $(imgui_include_h)
 main_dep += $(sdl_include_h)
 main_dep += $(stopwatch_h)
 main_dep += $(alloc_type_c)
@@ -279,7 +275,6 @@ imgui_dep := $(imgui_options_h)
 
 #*** app ***
 
-
 $(main_o): $(main_c) $(main_dep)
 	@echo "  main"
 	$(GPP) $(IFLAGS) -o $@ -c $< $(ALL_LFLAGS)
@@ -287,7 +282,7 @@ $(main_o): $(main_c) $(main_dep)
 
 $(imgui_o): $(imgui_c) $(imgui_dep)
 	@echo "  imgui"
-	$(GPP) $(IFLAGS) -o $@ -c $< $(SDL2) $(OPENGL)
+	$(GPP) $(IFLAGS) -o $@ -c $< $(LSDL) $(LDX11)
 
 #**************
 

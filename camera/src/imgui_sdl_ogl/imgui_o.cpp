@@ -1,3 +1,5 @@
+#pragma once
+
 #include "imgui_options.hpp"
 
 #include "../../../libs/imgui/misc/single_file/imgui_single_file.cpp"

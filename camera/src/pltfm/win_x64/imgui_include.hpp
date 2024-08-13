@@ -2,17 +2,16 @@
 
 #include "imgui_options.hpp"
 
-#include "../../../libs/imgui/imgui.h"
+#include "../../../../libs/imgui/imgui.h"
 
-#include "../../../libs/imgui/backends/imgui_impl_sdl2.h"
-#include "../../../libs/imgui/backends/imgui_impl_opengl3.h"
+#include "../../../../libs/imgui/backends/imgui_impl_sdl2.h"
+#include "../../../../libs/imgui/backends/imgui_impl_dx11.h"
 
+#include <d3d11.h>
+
+#define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <SDL_opengles2.h>
-#else
-#include <SDL2/SDL_opengl.h>
-#endif
+#include <SDL2/SDL_syswm.h>
 
 
 namespace ui
@@ -91,23 +90,17 @@ namespace ui
 
 namespace ui
 {
-    static inline SDL_Window* create_sdl_ogl_window(const char* title, int width, int height)
+    static inline SDL_Window* create_sdl_dx11_window(const char* title, int width, int height)
     {
-        // Create window with graphics context
-        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-
-        SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        SDL_Window* window = 
-            SDL_CreateWindow(
-                title, 
-                SDL_WINDOWPOS_CENTERED, 
-                SDL_WINDOWPOS_CENTERED, 
-                width, 
-                height, 
-                window_flags);
-
+        SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        SDL_Window* window = SDL_CreateWindow(
+            title, 
+            SDL_WINDOWPOS_CENTERED, 
+            SDL_WINDOWPOS_CENTERED, 
+            width,
+            height,
+            window_flags);
+        
         return window;
     }
 
@@ -140,97 +133,5 @@ namespace ui
         auto& style = ImGui::GetStyle();
         style.Colors[ImGuiCol_Text] = TEXT_WHITE;
         style.TabRounding = 0.0f;
-    }
-}
-
-
-/* opengl */
-
-namespace ogl
-{
-    static inline const char* get_glsl_version()
-    {
-        // Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-        // GL ES 2.0 + GLSL 100
-        static constexpr const char* glsl_version = "#version 100";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#elif defined(__APPLE__)
-        // GL 3.2 Core + GLSL 150
-        static constexpr const char* glsl_version = "#version 150";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-#else
-        // GL 3.0 + GLSL 130
-        static constexpr const char* glsl_version = "#version 130";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#endif
-
-        return glsl_version;
-    }
-
-
-    struct TextureId { int value = -1; };
-
-
-    template <size_t N>
-    class TextureList
-    {
-    public:
-        static constexpr size_t count = N;
-
-        GLuint data[count] = { 0 };
-    };
-
-
-    template <size_t N>
-    static inline TextureList<N> create_textures()
-    {
-        TextureList<N> textures{};
-
-        glGenTextures((GLsizei)N, textures.data);
-
-        for (int i = 0; i < textures.count; i++)
-        {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textures.data[i]);
-
-            // Setup filtering parameters for display
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-        }
-        
-        return textures;
-    }
-
-
-    template <typename P>
-    static inline void render_to_texture(P* data, int width, int height, TextureId texture)
-    {
-        static_assert(sizeof(P) == 4);
-
-        assert(texture.value >= 0);
-
-        glActiveTexture(GL_TEXTURE0 + texture.value);
-
-#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-#endif
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA, 
-            (GLsizei)width, 
-            (GLsizei)height,
-            0, GL_RGBA, GL_UNSIGNED_BYTE, 
-            (GLvoid*)data);
     }
 }
