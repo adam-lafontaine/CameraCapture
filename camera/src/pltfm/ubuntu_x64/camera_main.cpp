@@ -61,7 +61,7 @@ static void ui_input_window(ogl::Texture texture, u32 width, u32 height, f32 sca
 
     ImGui::Begin("Input");
 
-    ImGui::Image((void*)(intptr_t)texture.gl_ref, ImVec2(w, h));
+    ogl::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
 }
@@ -74,7 +74,7 @@ static void ui_camera_window(ogl::Texture texture, u32 width, u32 height, f32 sc
 
     ImGui::Begin("Camera");
 
-    ImGui::Image((void*)(intptr_t)texture.gl_ref, ImVec2(w, h));
+    ogl::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
 }
