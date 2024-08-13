@@ -31,7 +31,6 @@ namespace camera_usb
 {
     namespace img = image;
 
-
     constexpr u8 DEVICE_COUNT_MAX = 16;
 
 
@@ -84,7 +83,6 @@ namespace camera_usb
         u32 count = 0;
 
         img::Buffer32 rgba_data;
-
     };
 }
 
@@ -281,7 +279,7 @@ namespace camera_usb
 
 namespace camera_usb
 {
-    static bool enumerate_activate_devices(DeviceListUVC& list)
+    static bool enumerate_devices(DeviceListUVC& list)
     {
         auto res = uvc::uvc_init(&list.context, NULL);
         if (res != uvc::UVC_SUCCESS)
@@ -305,27 +303,17 @@ namespace camera_usb
             return false;
         }
 
-        u32 max_pixels = 0;
-
         list.count = 0;
         for (int i = 0; list.device_list[i]; ++i) 
         {
-            auto p_device = list.device_list[i]; 
             auto& device = list.devices[list.count];
 
             device.device_id = i;
-            device.p_device = p_device;           
+            device.p_device = list.device_list[i];           
 
             read_device_properties(device);
 
             ++list.count;
-
-            max_pixels = num::max(max_pixels, device.config.frame_width * device.config.frame_height);
-        }
-
-        if (max_pixels)
-        {
-            list.rgba_data = img::create_buffer32(max_pixels, "uvc rbga_data");
         }
 
         return list.count > 0;
@@ -432,24 +420,6 @@ namespace camera_usb
 namespace camera_usb
 {
     DeviceListUVC uvc_list;
-
-
-    static DeviceUVC find_device(Camera const& camera)
-    {
-        for (u32 i = 0; i < uvc_list.count; i++)
-        {
-            auto& device = uvc_list.devices[i];
-            if (device.device_id == camera.id)
-            {
-                return device;
-            }
-        }
-
-        DeviceUVC empty{};
-        empty.device_id = -1;
-
-        return empty;
-    }
 }
 
 
@@ -471,7 +441,7 @@ namespace camera_usb
             return cameras;
         }
 
-        if (!enumerate_activate_devices(uvc_list))
+        if (!enumerate_devices(uvc_list))
         {
             cameras.count = 0;
             cameras.status = ConnectionStatus::Disconnected;
@@ -482,7 +452,7 @@ namespace camera_usb
         for (u32 i = 0; i < cameras.count; i++)
         {
             auto& camera = cameras.list[i];
-            auto& device = uvc_list.devices[i];            
+            auto& device = uvc_list.devices[i];
 
             camera.id = device.device_id;
             camera.status = CameraStatus::Active;

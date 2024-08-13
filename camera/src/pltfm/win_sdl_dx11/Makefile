@@ -33,7 +33,7 @@ IFLAGS := $(ISDL) $(IVCPKG)
 
 LDX11 := -limm32 -ld3d11 -ld3dcompiler -ldxgi
 LSDL  := $(LDSDL) -lmingw32 -lsdl2 -lSDL2main -lopengl32 -lgdi32
-LUSB := $(LDVCPKG) -lmf -lmfplat -lmfreadwrite -lmfuuid -lShlwapi -ljpeg
+LUSB := $(LDVCPKG) -lmf -lmfplat -lmfreadwrite -lmfuuid -lShlwapi -lOle32 -ljpeg
 
 ALL_LFLAGS :=  $(LSDL) $(LDX11) $(LUSB)
 

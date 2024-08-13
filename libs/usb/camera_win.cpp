@@ -10,23 +10,11 @@
 #include <mfidl.h>
 #include <Mfreadwrite.h>
 #include <Shlwapi.h>
-#include <vector>
-
-#ifdef MSVC
-
-// TODO Makefile flags
-#pragma comment(lib, "mf.lib")
-#pragma comment(lib, "mfplat.lib")
-#pragma comment(lib, "mfreadwrite.lib")
-#pragma comment(lib, "mfuuid.lib")
-#pragma comment(lib, "Shlwapi.lib")
-
-#endif
 
 
 namespace w32
 {
-    enum class PixelFormat :  int
+    enum class PixelFormat : int
     {
         Unknown = -1,
 
@@ -434,6 +422,277 @@ namespace w32
 
 #include "camera_usb.hpp"
 #include "mjpeg_convert.hpp"
+#include "../util/numeric.hpp"
+#include "../util/stopwatch.hpp"
+
+namespace convert
+{
+    namespace img = image;
+
+
+    static bool mjpeg_to_rgba(w32::Frame& frame, img::ImageView const& dst)
+    {
+        auto format = mjpeg::image_format::RGBA8;
+
+        return mjpeg::convert((u8*)frame.data, dst.width, (u32)frame.size_bytes, (u8*)dst.matrix_data_, format);
+    }
+
+
+    static bool nv12_rgba(w32::Frame& frame, img::ImageView const& dst)
+    {
+        auto const width = dst.width;
+        auto const height = dst.height;
+
+        assert(frame.size_bytes == width * height + width * height / 2);
+
+        auto sy = (u8*)frame.data;
+        auto suv = sy + width * height;
+        auto sd = dst.matrix_data_;
+
+        auto u = suv;
+        auto v = u + 1;        
+
+        for (u32 h = 0; h < height; h += 2)
+        {
+            auto y1 = sy + h * width;
+            auto y2 = y1 + 1;
+            auto y3 = y1 + width;
+            auto y4 = y3 + 1;
+
+            auto d1 = sd + h * width;
+            auto d2 = d1 + 1;
+            auto d3 = d1 + width;
+            auto d4 = d3 + 1;
+
+            for (u32 w = 0; w < width; w += 2)
+            {
+                
+                y1 += 2;
+                y2 += 2;
+                y3 += 2;
+                y4 += 2;
+                u += 2;
+                v += 2;
+            }
+        }
+
+
+    }
+}
+
+
+namespace camera_usb
+{
+    namespace img = image;
+
+    constexpr u8 DEVICE_COUNT_MAX = 16;
+
+
+    class DeviceW32
+    {
+    public:
+        int device_id = -1;
+
+        w32::Device_p p_device = nullptr;
+        w32::MediaSource_p p_source = nullptr;
+        w32::SourceReader_p p_reader = nullptr;
+
+        w32::Sample_p p_sample = nullptr;
+
+        w32::FrameFormat format;
+
+        Stopwatch grab_sw;
+        f32 grab_ms;
+
+        img::ImageView rgba;
+    };
+
+
+    class DeviceListW32
+    {
+    public:
+        w32::Device_p* device_list = nullptr;
+
+        DeviceW32 devices[DEVICE_COUNT_MAX] = { 0 };
+
+        u32 count = 0;
+
+        img::Buffer32 rgba_data;
+    };
+}
+
+
+/* wrappers */
+
+namespace camera_usb
+{
+    static void close_device(DeviceW32& device)
+    {
+        w32::release(device.p_source);
+        w32::release(device.p_reader);
+        w32::release(device.p_device);
+
+        //device.format; ???
+    }
+
+
+    static bool open_device(DeviceW32& device)
+    {
+        return w32::activate(device.p_device, device.p_source, device.p_reader);
+    }
+
+
+    static bool read_device_format(DeviceW32& device)
+    {
+        auto result = w32::get_frame_format(device.p_reader);
+        if (!result.success)
+        {
+            return false;
+        }
+
+        device.format = result.data;
+        return true;
+    }
+
+
+    static bool grab_and_convert_frame_rgba(DeviceW32& device)
+    {
+        auto result = w32::read_frame(device.p_reader, device.p_sample);
+        if (!result.success)
+        {
+            return false;
+        }
+
+        auto& frame = result.data;
+
+        if (device.format.pixel_format == w32::PixelFormat::UYVY)
+        {
+            img::fill(device.rgba, img::to_pixel(255, 0, 0));
+        }
+        else
+        {
+            img::fill(device.rgba, img::to_pixel(0, 255, 0));
+        }
+
+        /*if (!convert::mjpeg_to_rgba(frame, device.rgba))
+        {
+            return false;
+        }*/
+
+        w32::release(frame);
+        w32::release(device.p_sample);
+
+        return true;
+    }
+}
+
+
+/* device setup */
+
+namespace camera_usb
+{
+    static bool read_device_properties(DeviceW32& device)
+    {
+        // TODO
+        return true;
+    }
+
+
+    static bool connect_device(DeviceW32& device)
+    {
+        if (!open_device(device))
+        {
+            assert(false && "Could not open device");
+            return false;
+        }
+
+        if (!read_device_format(device))
+        {
+            assert(false && "Error getting device configuration");
+            close_device(device);
+            return false;
+        }
+
+        return true;
+    }
+}
+
+
+/* enumerate */
+
+namespace camera_usb
+{
+    static bool enumerate_devices(DeviceListW32& list)
+    {
+        if (!w32::init())
+        {
+            return false;
+        }
+
+        HRESULT hr = S_OK;
+
+        IMFAttributes* p_attr = nullptr;
+
+        hr = MFCreateAttributes(&p_attr, 1);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        hr = p_attr->SetGUID(
+            MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE,
+            MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_VIDCAP_GUID
+        );
+
+        if (FAILED(hr))
+        {
+            w32::release(p_attr);
+            return false;
+        }
+
+        u32 n_devices = 0;
+
+        hr = MFEnumDeviceSources(p_attr, &list.device_list, &n_devices);
+        w32::release(p_attr);
+
+        if (FAILED(hr) || !n_devices)
+        {      
+            return false;
+        }
+
+        list.count = n_devices;
+        assert(n_devices <= DEVICE_COUNT_MAX);
+
+        for (u32 i = 0; i < n_devices; ++i)
+        {
+            auto& device = list.devices[i];
+
+            device.p_device = list.device_list[i];
+            device.device_id = i;
+        }
+
+        return list.count > 0;
+    }
+
+
+    static void close_devices(DeviceListW32& list)
+    {
+        for (int i = 0; i < list.count; ++i)
+        {
+            auto& device = list.devices[i];
+            close_device(device);            
+        }
+
+        CoTaskMemFree(list.device_list);
+        w32::shutdown();
+    }
+}
+
+
+namespace camera_usb
+{
+    static DeviceListW32 w32_list;
+}
 
 
 /* api */
@@ -442,35 +701,138 @@ namespace camera_usb
 {
     CameraList enumerate_cameras()
     {
-        CameraList list{};
-        list.status = ConnectionStatus::Disconnected;
+        CameraList cameras{};
+        cameras.status = ConnectionStatus::Connecting;
 
+        auto n_pixels = WIDTH_MAX * HEIGHT_MAX;
+        w32_list.rgba_data = img::create_buffer32(n_pixels, "w32 rgba");
+        if (!w32_list.rgba_data.ok)
+        {
+            cameras.count = 0;
+            cameras.status = ConnectionStatus::Disconnected;
+            return cameras;
+        }
 
-        return list;
+        if (!enumerate_devices(w32_list))
+        {
+            cameras.count = 0;
+            cameras.status = ConnectionStatus::Disconnected;
+            return cameras;
+        }
+
+        cameras.count = w32_list.count;
+        for (u32 i = 0; i < cameras.count; i++)
+        {
+            auto& camera = cameras.list[i];
+            auto& device = w32_list.devices[i];
+
+            camera.id = device.device_id;
+            camera.status = CameraStatus::Active;
+
+            // TODO
+            camera.vendor = span::to_string_view("XXXX");
+            camera.product = span::to_string_view("XXXX");
+            camera.serial_number = span::to_string_view("XXXX");
+            camera.label = span::to_string_view("XXXX");
+
+            camera.format = span::to_string_view("XXXX");
+        }
+
+        cameras.status = ConnectionStatus::Connected;
+
+        return cameras;
     }
 
 
     void close(CameraList& cameras)
     {
+        close_devices(w32_list);
 
+        for (u32 i = 0; i < cameras.count; i++)
+        {
+            auto& camera = cameras.list[i];
+            camera.id = -1;
+            camera.status = CameraStatus::Inactive;
+        }
     }
 
 
     bool open_camera(Camera& camera)
     {
-        return false;
+        camera.busy = 1;
+
+        auto& device = w32_list.devices[camera.id];
+        if (!connect_device(device))
+        {        
+            camera.busy = 0;    
+            return false;
+        }
+
+        auto& format = device.format;
+        camera.frame_width = format.width;
+        camera.frame_height = format.height;
+        camera.fps = format.fps;
+
+        camera.fps = (u32)format.pixel_format;
+
+        // TODO
+        //camera.format = span::to_string_view(config.format_code);
+
+        // only one at a time
+        mb::reset_buffer(w32_list.rgba_data);
+
+        device.rgba = img::make_view(camera.frame_width, camera.frame_height, w32_list.rgba_data);
+
+        camera.status = CameraStatus::Open;
+        camera.busy = 0;
+
+        return true;
     }
 
 
     void grab_image(Camera& camera, img::ImageView const& dst)
     {
+        camera.busy = 1;
+        auto& device = w32_list.devices[camera.id];
+        
+        device.grab_sw.start();
 
+        if (grab_and_convert_frame_rgba(device))
+        {
+            img::copy(device.rgba, dst);
+        }
+        else
+        {
+            img::fill(dst, img::to_pixel(0, 0, 255));
+        }
+
+        device.grab_ms = device.grab_sw.get_time_milli();
+        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+
+        camera.busy = 0;
     }
 
 
     void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition)
     {
+        auto& device = w32_list.devices[camera.id];
 
+        auto c_status = camera.status;
+
+        camera.status = CameraStatus::Streaming;
+
+        while (stream_condition())
+        {
+            device.grab_sw.start();
+            if (grab_and_convert_frame_rgba(device))
+            {
+                on_grab(device.rgba);
+            }
+            device.grab_ms = device.grab_sw.get_time_milli();
+            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+        }
+
+        camera.status = c_status;
     }
 }
 
