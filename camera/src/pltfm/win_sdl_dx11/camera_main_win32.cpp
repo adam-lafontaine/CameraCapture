@@ -359,7 +359,13 @@ static bool main_init()
     SDL_DisplayMode dm;
     SDL_GetCurrentDisplayMode(0, &dm);
 
-    window = ui::create_sdl_dx11_window("Camera", dm.w, dm.h);
+    //auto dw = (int)(0.8f * dm.w);
+    //auto dh = (int)(0.8f * dm.h);
+
+    auto dw = dm.w;
+    auto dh = dm.h;
+
+    window = ui::create_sdl_dx11_window("Camera", dw, dh);
     if (!window)
     {
         sdl::print_error("Error: create_sdl_ogl_window()");
