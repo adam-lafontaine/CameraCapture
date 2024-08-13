@@ -183,7 +183,16 @@ namespace ogl
 
     struct TextureId { int value = -1; };
 
-    using Texture = GLuint;
+    class Texture
+    {
+    public:
+        GLuint gl_ref;
+        TextureId id;
+
+        int image_width;
+        int image_height;
+        void* image_data;
+    };
 
 
     template <size_t N>
@@ -194,6 +203,8 @@ namespace ogl
 
         Texture data[count] = { 0 };
 
+        GLuint gl_ref_data[count] = { 0 };
+
         Texture& get(TextureId id) { return data[id.value]; }
     };
 
@@ -203,18 +214,22 @@ namespace ogl
     {
         TextureList<N> textures{};
 
-        glGenTextures((GLsizei)N, textures.data);
+        glGenTextures((GLsizei)N, textures.gl_ref_data);
 
         for (int i = 0; i < textures.count; i++)
         {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textures.data[i]);
+            auto& texture = textures.data[i];
+            texture.id.value = i;
+            texture.gl_ref = textures.gl_ref_data[i];
+
+            /*glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, texture.gl_ref);
 
             // Setup filtering parameters for display
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same*/
         }
         
         return textures;
@@ -222,22 +237,47 @@ namespace ogl
 
 
     template <typename P>
-    static inline void render_to_texture(P* data, int width, int height, TextureId texture)
+    static inline void init_texture(P* data, int width, int height, Texture& texture)
     {
         static_assert(sizeof(P) == 4);
 
-        assert(texture.value >= 0);
+        texture.image_data = (void*)data;
+        texture.image_width = width;
+        texture.image_height = height;
 
-        glActiveTexture(GL_TEXTURE0 + texture.value);
+        glActiveTexture(GL_TEXTURE0 + texture.id.value);
+        glBindTexture(GL_TEXTURE_2D, texture.gl_ref);
+
+        // Setup filtering parameters for display
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+    }
+    
+
+    static inline void render_texture(Texture const& texture)
+    {
+        auto texture_id = texture.id.value;
+
+        assert(texture_id >= 0);
+
+        glActiveTexture(GL_TEXTURE0 + texture_id);
 
 #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 #endif
         glTexImage2D(
             GL_TEXTURE_2D, 0, GL_RGBA, 
-            (GLsizei)width, 
-            (GLsizei)height,
+            (GLsizei)texture.image_width, 
+            (GLsizei)texture.image_height,
             0, GL_RGBA, GL_UNSIGNED_BYTE, 
-            (GLvoid*)data);
+            (GLvoid*)texture.image_data);
+    }
+
+
+    static inline void display_texture(Texture const& texture, ImVec2 const& size)
+    {
+        ImGui::Image((void*)(intptr_t)texture.gl_ref, size);
     }
 }

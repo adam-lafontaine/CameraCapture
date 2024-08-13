@@ -61,7 +61,7 @@ static void ui_input_window(ogl::Texture texture, u32 width, u32 height, f32 sca
 
     ImGui::Begin("Input");
 
-    ImGui::Image((void*)(intptr_t)texture, ImVec2(w, h));
+    ImGui::Image((void*)(intptr_t)texture.gl_ref, ImVec2(w, h));
 
     ImGui::End();
 }
@@ -74,7 +74,7 @@ static void ui_camera_window(ogl::Texture texture, u32 width, u32 height, f32 sc
 
     ImGui::Begin("Camera");
 
-    ImGui::Image((void*)(intptr_t)texture, ImVec2(w, h));
+    ImGui::Image((void*)(intptr_t)texture.gl_ref, ImVec2(w, h));
 
     ImGui::End();
 }
@@ -305,18 +305,6 @@ static void render_imgui_frame()
 }
 
 
-static void render_input_display(img::ImageView const& src)
-{
-    ogl::render_to_texture(src.matrix_data_, (int)src.width, (int)src.height, input_texture_id);
-}
-
-
-static void render_camera(img::ImageView const& src)
-{
-    ogl::render_to_texture(src.matrix_data_, (int)src.width, (int)src.height, camera_texture_id);
-}
-
-
 static bool main_init()
 {
     if(!sdl::init())
@@ -369,15 +357,6 @@ static bool main_init()
     
     ui_state.io = &io;
 
-    textures = ogl::create_textures<N_TEXTURES>();
-    
-    if (!idsp::init(io_state))
-    {
-        sdl::print_message("Error: idsp::init()");
-        sdl::close();
-        return false;
-    }    
-
     // TODO init camera app
     u32 w = 1280;
     u32 h = 720;
@@ -386,6 +365,21 @@ static bool main_init()
     img::fill(camera_state.display, img::to_pixel(128));
 
     cdsp::init_async(camera_state);
+    
+    if (!idsp::init(io_state))
+    {
+        sdl::print_message("Error: idsp::init()");
+        sdl::close();
+        return false;
+    }
+
+    textures = ogl::create_textures<N_TEXTURES>();
+
+    auto& io_display = io_state.display;
+    ogl::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
+    
+    auto& camera_display = camera_state.display;
+    ogl::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
 
     return true;
 }
@@ -422,9 +416,9 @@ static void main_loop()
         auto& input = user_input[input_id_curr];
         
         idsp::update(input, io_state);
-        render_input_display(io_state.display);
 
-        render_camera(camera_state.display);
+        ogl::render_texture(textures.get(input_texture_id));
+        ogl::render_texture(textures.get(camera_texture_id));
 
         render_imgui_frame();        
 

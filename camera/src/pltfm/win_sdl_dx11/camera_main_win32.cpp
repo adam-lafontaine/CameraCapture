@@ -51,7 +51,7 @@ static void ui_input_window(dx11::Texture const& texture, u32 width, u32 height,
 
     ImGui::Begin("Input");
 
-    ImGui::Image((void*)texture.srv, ImVec2(w, h));
+    dx11::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
 }
@@ -63,8 +63,8 @@ static void ui_camera_window(dx11::Texture const& texture, u32 width, u32 height
     auto h = height * scale;
 
     ImGui::Begin("Camera");
-
-    ImGui::Image((void*)texture.srv, ImVec2(w, h));
+    
+    dx11::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
 }
@@ -306,18 +306,6 @@ static void render_imgui_frame()
 }
 
 
-static void render_input_display(img::ImageView const& src)
-{
-    dx11::render_to_texture(src.matrix_data_, src.width, src.height, textures.get(input_texture_id));
-}
-
-
-static void render_camera(img::ImageView const& src)
-{
-    dx11::render_to_texture(src.matrix_data_, src.width, src.height, textures.get(camera_texture_id));
-}
-
-
 static bool main_init()
 {
     if(!sdl::init())
@@ -335,11 +323,12 @@ static bool main_init()
     SDL_DisplayMode dm;
     SDL_GetCurrentDisplayMode(0, &dm);
 
-    //auto dw = (int)(0.8f * dm.w);
-    //auto dh = (int)(0.8f * dm.h);
+    auto df = 0.9f;
+    auto dw = (int)(df * dm.w);
+    auto dh = (int)(df * dm.h);
 
-    auto dw = dm.w;
-    auto dh = dm.h;
+    //auto dw = dm.w;
+    //auto dh = dm.h;
 
     window = ui::create_sdl_dx11_window("Camera", dw, dh);
     if (!window)
@@ -380,13 +369,6 @@ static bool main_init()
     ui::set_imgui_style();
     ui_state.io = &io;
 
-    if (!idsp::init(io_state))
-    {
-        sdl::print_message("Error: idsp::init()");
-        sdl::close();
-        return false;
-    }
-
     // TODO init camera app
     u32 w = 1280;
     u32 h = 720;
@@ -395,6 +377,13 @@ static bool main_init()
     img::fill(camera_state.display, img::to_pixel(128));
 
     cdsp::init_async(camera_state);    
+
+    if (!idsp::init(io_state))
+    {
+        sdl::print_message("Error: idsp::init()");
+        sdl::close();
+        return false;
+    }
 
     textures = dx11::create_textures<N_TEXTURES>();
 
@@ -441,9 +430,9 @@ static void main_loop()
         auto& input = user_input[input_id_curr];
         
         idsp::update(input, io_state);
-        render_input_display(io_state.display);
-
-        render_camera(camera_state.display);
+        
+        dx11::render_texture(textures.get(input_texture_id));
+        dx11::render_texture(textures.get(camera_texture_id));
 
         render_imgui_frame(); 
     }

@@ -154,9 +154,13 @@ namespace dx11
     class Texture
     {
     public:
-        D3D11_TEXTURE2D_DESC desc;
         ID3D11Texture2D *pTexture = 0;
         ID3D11ShaderResourceView* srv;
+        TextureId id;
+
+        int image_width;
+        int image_height;
+        void* image_data;
     };
 
     template <size_t N>
@@ -178,7 +182,8 @@ namespace dx11
 
         for (int i = 0; i < textures.count; i++)
         {
-
+            auto& texture = textures.data[i];
+            texture.id.value = i;
         }
 
         return textures;
@@ -186,14 +191,18 @@ namespace dx11
 
 
     template <typename P>
-    static inline void init_texture(P* data, UINT width, UINT height, Texture& texture)
+    static inline void init_texture(P* data, int width, int height, Texture& texture)
     {
         static_assert(sizeof(P) == 4);
 
-        auto& desc = texture.desc;
+        texture.image_data = (void*)data;
+        texture.image_width = width;
+        texture.image_height = height;
+        
         auto& pTexture = texture.pTexture;
         auto& srv = texture.srv;
 
+        D3D11_TEXTURE2D_DESC desc;
         ZeroMemory(&desc, sizeof(desc));
         desc.Width = width;
         desc.Height = height;
@@ -219,18 +228,26 @@ namespace dx11
         srvDesc.Texture2D.MostDetailedMip = 0;
         g_pd3dDevice->CreateShaderResourceView(pTexture, &srvDesc, &srv);
         //pTexture->Release();
-        //pTexture = 0;
 
         g_pd3dDeviceContext->PSSetShaderResources(0, 1, &srv);
     }
+    
 
-
-    template <typename P>
-    static inline void render_to_texture(P* data, UINT width, UINT height, Texture& texture)
+    static inline void render_texture(Texture& texture)
     {
-        g_pd3dDeviceContext->UpdateSubresource(texture.pTexture, 0, 0, (void*)data, width * 4, 0);
+        g_pd3dDeviceContext->UpdateSubresource(
+            texture.pTexture, 
+            0, 0, 
+            texture.image_data,
+            texture.image_width * 4, 
+            0);
+
         g_pd3dDeviceContext->PSSetShaderResources(0, 1, &texture.srv);
     }
 
 
+    static inline void display_texture(Texture const& texture, ImVec2 const& size)
+    {
+        ImGui::Image((void*)texture.srv, size);
+    }
 }
