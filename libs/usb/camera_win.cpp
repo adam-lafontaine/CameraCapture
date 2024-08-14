@@ -438,7 +438,7 @@ namespace convert
     }
 
 
-    static void yuv_to_rgb(u8 y, u8 u, u8 v, img::Pixel* dst)
+    static void yuv_to_rgba(u8 y, u8 u, u8 v, img::Pixel* dst)
     {
         constexpr f32 yr = 1.0f;
         constexpr f32 ur = 0.0f;
@@ -469,6 +469,99 @@ namespace convert
     }
 
 
+    static void yuyv_to_rgba(w32::Frame& frame, img::ImageView const& dst)
+    {
+        auto const len  = dst.width * dst.height;
+
+        auto yuyv = (u8*)frame.data;
+        auto d = dst.matrix_data_;
+
+        auto y1 = yuyv;
+        auto u = y1 + 1;
+        auto y2 = u + 1;
+        auto v = y2 + 1;
+
+        auto d1 = d;
+        auto d2 = d1 + 1;
+
+        for (u32 i = 0; i < len; i += 4)
+        {
+            yuv_to_rgba(*y1, *u, *v, d1);
+            yuv_to_rgba(*y2, *u, *v, d2);
+
+            y1 += 4;
+            u += 4;
+            y2 += 4;
+            v += 4;
+
+            d1 += 1;
+            d2 += 1;
+        }
+    }
+
+
+    static void yvyu_to_rgba(w32::Frame& frame, img::ImageView const& dst)
+    {
+        auto const len  = dst.width * dst.height;
+
+        auto yuyv = (u8*)frame.data;
+        auto d = dst.matrix_data_;
+
+        auto y1 = yuyv;
+        auto v = y1 + 1;
+        auto y2 = v + 1;
+        auto u = y2 + 1;
+
+        auto d1 = d;
+        auto d2 = d1 + 1;
+
+        for (u32 i = 0; i < len; i += 4)
+        {
+            yuv_to_rgba(*y1, *u, *v, d1);
+            yuv_to_rgba(*y2, *u, *v, d2);
+
+            y1 += 4;
+            v += 4;
+            y2 += 4;
+            u += 4;
+
+            d1 += 1;
+            d2 += 1;
+        }
+    }
+
+
+    static void uyvy_to_rgba(w32::Frame& frame, img::ImageView const& dst)
+    {
+        auto const len  = dst.width * dst.height;
+
+        auto uyvy = (u8*)frame.data;
+        auto d = dst.matrix_data_;
+
+        auto u = uyvy;
+        auto y1 = u + 1;
+        auto v = y1 + 1;
+        auto y2 = v + 1;
+
+        auto d1 = d;
+        auto d2 = d1 + 1;
+
+        for (u32 i = 0; i < len; i += 4)
+        {
+            yuv_to_rgba(*y1, *u, *v, d1);
+            yuv_to_rgba(*y2, *u, *v, d2);
+
+            y1 += 4;
+            v += 4;
+            y2 += 4;
+            u += 4;
+
+            d1 += 1;
+            d2 += 1;
+        }
+    }
+    
+    
     static void nv12_to_rgba(w32::Frame& frame, img::ImageView const& dst)
     {
         auto const width = dst.width;
@@ -496,7 +589,12 @@ namespace convert
             auto d4 = d3 + 1;
 
             for (u32 w = 0; w < width; w += 2)
-            {                
+            {  
+                yuv_to_rgba(*y1, *u, *v, d1);
+                yuv_to_rgba(*y2, *u, *v, d2);
+                yuv_to_rgba(*y3, *u, *v, d3);
+                yuv_to_rgba(*y4, *u, *v, d4);
+
                 y1 += 2;
                 y2 += 2;
                 y3 += 2;
@@ -509,12 +607,44 @@ namespace convert
 
                 u += 2;
                 v += 2;
-
-                yuv_to_rgb(*y1, *u, *v, d1);
-                yuv_to_rgb(*y2, *u, *v, d2);
-                yuv_to_rgb(*y3, *u, *v, d3);
-                yuv_to_rgb(*y4, *u, *v, d4);
             }
+        }
+    }
+
+}
+
+
+namespace convert
+{
+    using PF = w32::PixelFormat;
+
+
+    static void convert(w32::Frame& frame, img::ImageView const& dst, PF format)
+    {
+        switch (format)
+        {
+        case PF::YUYV:
+            yuyv_to_rgba(frame, dst);
+            break;
+        
+        case PF::YVYU:
+            yvyu_to_rgba(frame, dst);
+            break;
+        
+        case PF::UYVY:
+            uyvy_to_rgba(frame, dst);
+            break;
+
+        case PF::NV12:
+            nv12_to_rgba(frame, dst);
+            break;
+        
+        case PF::MJPG:
+            mjpeg_to_rgba(frame, dst);
+            break;
+
+
+        default: img::fill(dst, img::to_pixel(100));
         }
     }
 }
@@ -604,7 +734,7 @@ namespace camera_usb
 
         auto& frame = result.data;
 
-        convert::nv12_to_rgba(frame, device.rgba);
+        convert::convert(frame, device.rgba, device.format.pixel_format);
 
         w32::release(frame);
         w32::release(device.p_sample);
@@ -827,10 +957,6 @@ namespace camera_usb
         if (grab_and_convert_frame_rgba(device))
         {
             img::copy(device.rgba, dst);
-        }
-        else
-        {
-            img::fill(dst, img::to_pixel(0, 0, 255));
         }
 
         device.grab_ms = device.grab_sw.get_time_milli();
