@@ -430,15 +430,46 @@ namespace convert
     namespace img = image;
 
 
-    static bool mjpeg_to_rgba(w32::Frame& frame, img::ImageView const& dst)
+    static void mjpeg_to_rgba(w32::Frame& frame, img::ImageView const& dst)
     {
         auto format = mjpeg::image_format::RGBA8;
 
-        return mjpeg::convert((u8*)frame.data, dst.width, (u32)frame.size_bytes, (u8*)dst.matrix_data_, format);
+        mjpeg::convert((u8*)frame.data, dst.width, (u32)frame.size_bytes, (u8*)dst.matrix_data_, format);
     }
 
 
-    static bool nv12_rgba(w32::Frame& frame, img::ImageView const& dst)
+    static void yuv_to_rgb(u8 y, u8 u, u8 v, img::Pixel* dst)
+    {
+        constexpr f32 yr = 1.0f;
+        constexpr f32 ur = 0.0f;
+        constexpr f32 vr = 1.13983f;
+
+        constexpr f32 yg = 1.0f;
+        constexpr f32 ug = -0.39465f;
+        constexpr f32 vg = -0.5806f;
+
+        constexpr f32 yb = 1.0f;
+        constexpr f32 ub = 2.03211f;
+        constexpr f32 vb = 0.0f;
+
+        constexpr f32 c = 1.0f / 255.0f;
+
+        auto yc = y * c;
+        auto uc = u * c - 0.5f;
+        auto vc = v * c - 0.5f;
+
+        auto r = num::clamp((yr * yc) + (ur * uc) + (vr * vc), 0.0f, 1.0f) * 255;
+        auto g = num::clamp((yg * yc) + (ug * uc) + (vg * vc), 0.0f, 1.0f) * 255;
+        auto b = num::clamp((yb * yc) + (ub * uc) + (vb * vc), 0.0f, 1.0f) * 255;
+
+        dst->red = num::round_to_unsigned<u8>(r);
+        dst->green = num::round_to_unsigned<u8>(g);
+        dst->blue = num::round_to_unsigned<u8>(b);
+        dst->alpha = 255;
+    }
+
+
+    static void nv12_to_rgba(w32::Frame& frame, img::ImageView const& dst)
     {
         auto const width = dst.width;
         auto const height = dst.height;
@@ -465,18 +496,26 @@ namespace convert
             auto d4 = d3 + 1;
 
             for (u32 w = 0; w < width; w += 2)
-            {
-                
+            {                
                 y1 += 2;
                 y2 += 2;
                 y3 += 2;
                 y4 += 2;
+
+                d1 += 2;
+                d2 += 2;
+                d3 += 2;
+                d4 += 2;
+
                 u += 2;
                 v += 2;
+
+                yuv_to_rgb(*y1, *u, *v, d1);
+                yuv_to_rgb(*y2, *u, *v, d2);
+                yuv_to_rgb(*y3, *u, *v, d3);
+                yuv_to_rgb(*y4, *u, *v, d4);
             }
         }
-
-
     }
 }
 
@@ -565,19 +604,7 @@ namespace camera_usb
 
         auto& frame = result.data;
 
-        if (device.format.pixel_format == w32::PixelFormat::UYVY)
-        {
-            img::fill(device.rgba, img::to_pixel(255, 0, 0));
-        }
-        else
-        {
-            img::fill(device.rgba, img::to_pixel(0, 255, 0));
-        }
-
-        /*if (!convert::mjpeg_to_rgba(frame, device.rgba))
-        {
-            return false;
-        }*/
+        convert::nv12_to_rgba(frame, device.rgba);
 
         w32::release(frame);
         w32::release(device.p_sample);
