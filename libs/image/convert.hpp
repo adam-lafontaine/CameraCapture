@@ -34,10 +34,15 @@ namespace convert
 
         AI44 = fcc_to_u32("AI44"),
         AYUV = fcc_to_u32("AYUV"),
+        YUYV = fcc_to_u32("YUYV"),
+        YUNV = fcc_to_u32("YUNV"),
         YUY2 = fcc_to_u32("YUY2"),
         YVYU = fcc_to_u32("YVYU"),
         YVU9 = fcc_to_u32("YVU9"),
         UYVY = fcc_to_u32("UYVY"),
+        Y422 = fcc_to_u32("Y422"),
+        UYNV = fcc_to_u32("UYNV"),
+        HDYC = fcc_to_u32("HDYC"),
         NV11 = fcc_to_u32("NV11"),
         NV12 = fcc_to_u32("NV12"),
         YV12 = fcc_to_u32("YV12"),
@@ -147,6 +152,8 @@ namespace convert
 
         switch (format)
         {
+        case PF::YUYV:
+        case PF::YUNV:
         case PF::YUY2:
             yuyv_to_rgba(src, dst);
             break;
@@ -156,6 +163,9 @@ namespace convert
             break;
         
         case PF::UYVY:
+        case PF::Y422:
+        case PF::UYNV:
+        case PF::HDYC:
             uyvy_to_rgba(src, dst);
             break;
 
@@ -179,6 +189,8 @@ namespace convert
 
         switch (format)
         {
+        case PF::YUYV:
+        case PF::YUNV:
         case PF::YUY2:
             yuyv_to_rgba(src, dst);
             break;
@@ -188,6 +200,9 @@ namespace convert
             break;
         
         case PF::UYVY:
+        case PF::Y422:
+        case PF::UYNV:
+        case PF::HDYC:
             uyvy_to_rgba(src, dst);
             break;
 
