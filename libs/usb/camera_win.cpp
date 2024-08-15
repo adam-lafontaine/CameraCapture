@@ -1,9 +1,14 @@
 #pragma once
 
+#include "camera_usb.hpp"
+#include "../image/convert.hpp"
+#include "../qsprintf/qsprintf.hpp"
+#include "../util/numeric.hpp"
+#include "../util/stopwatch.hpp"
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-
 
 #include <Windows.h>
 #include <mfapi.h>
@@ -12,128 +17,12 @@
 #include <Shlwapi.h>
 
 
-namespace w32
-{
-    constexpr u32 fcc_to_u32(cstr code)
-    {
-        u32 value = 0;
-        
-        for (u32 i = 0; i < 4; i++)
-        {
-            value |= (u8)code[i] << i * 8;
-        }
-
-        return value;
-    }
-
-
-    static void u32_to_fcc(u32 src, char* dst)
-    {
-        union
-        {
-            u32 value;
-            char fcc[4];
-        } sd;
-
-        sd.value = src;
-
-        for (u32 i = 0; i < 4; i++)
-        {
-            dst[i] = sd.fcc[i];
-        }
-    }
-
-
-    enum class PixelFormat : u32
-    {
-        RGB32  = 22, // D3DFMT_X8R8G8B8
-        ARGB32 = 21, // D3DFMT_A8R8G8B8
-        RGB24  = 20, // D3DFMT_R8G8B8
-        RGB555 = 25, // D3DFMT_X1R5G5B5
-        RGB565 = 23, // D3DFMT_R5G6B5
-        RGB8   = 41, // D3DFMT_P8
-        L8     = 50, // D3DFMT_L8
-        L16    = 81, // D3DFMT_L16
-        D16    = 80, // D3DFMT_D16
-
-        AI44 = fcc_to_u32("AI44"),
-        AYUV = fcc_to_u32("AYUV"),
-        YUY2 = fcc_to_u32("YUY2"),
-        YVYU = fcc_to_u32("YVYU"),
-        YVU9 = fcc_to_u32("YVU9"),
-        UYVY = fcc_to_u32("UYVY"),
-        NV11 = fcc_to_u32("NV11"),
-        NV12 = fcc_to_u32("NV12"),
-        YV12 = fcc_to_u32("YV12"),
-        I420 = fcc_to_u32("I420"),
-        IYUV = fcc_to_u32("IYUV"),
-        Y210 = fcc_to_u32("Y210"),
-        Y216 = fcc_to_u32("Y216"),
-        Y410 = fcc_to_u32("Y410"),
-        Y416 = fcc_to_u32("Y416"),
-        Y41P = fcc_to_u32("Y41P"),
-        Y41T = fcc_to_u32("Y41T"),
-        Y42T = fcc_to_u32("Y42T"),
-        P210 = fcc_to_u32("P210"),
-        P216 = fcc_to_u32("P216"),
-        P010 = fcc_to_u32("P010"),
-        P016 = fcc_to_u32("P016"),
-        v210 = fcc_to_u32("v210"),
-        v216 = fcc_to_u32("v216"),
-        v410 = fcc_to_u32("v410"),
-        MP43 = fcc_to_u32("MP43"),
-        MP4S = fcc_to_u32("MP4S"),
-        M4S2 = fcc_to_u32("M4S2"),
-        MP4V = fcc_to_u32("MP4V"),
-        WMV1 = fcc_to_u32("WMV1"),
-        WMV2 = fcc_to_u32("WMV2"),
-        WMV3 = fcc_to_u32("WMV3"),
-        WVC1 = fcc_to_u32("WVC1"),
-        MSS1 = fcc_to_u32("MSS1"),
-        MSS2 = fcc_to_u32("MSS2"),
-        MPG1 = fcc_to_u32("MPG1"),
-        DVSL = fcc_to_u32("dvsl"),
-        DVSD = fcc_to_u32("dvsd"),
-        DVHD = fcc_to_u32("dvhd"),
-        DV25 = fcc_to_u32("dv25"),
-        DV50 = fcc_to_u32("dv50"),
-        DVH1 = fcc_to_u32("dvh1"),
-        DVC  = fcc_to_u32("dvc "),
-        H264 = fcc_to_u32("H264"),
-        H265 = fcc_to_u32("H265"),
-        MJPG = fcc_to_u32("MJPG"),
-        _420O = fcc_to_u32("420O"),
-        HEVC = fcc_to_u32("HEVC"),
-        HEVC_ES = fcc_to_u32("HEVS"),
-        VP80 = fcc_to_u32("VP80"),
-        VP90 = fcc_to_u32("VP90"),
-        ORAW = fcc_to_u32("ORAW"),
-        H263 = fcc_to_u32("H263"),
-
-        A2R10G10B10   = 31,  // D3DFMT_A2B10G10R10
-        A16B16G16R16F = 113, // D3DFMT_A16B16G16R16F
-
-        VP10 = fcc_to_u32("VP10"),
-        AV1 = fcc_to_u32("AV01"),
-
-        Unknown = fcc_to_u32("XXXX")
-    };
-
-
-    static void pf_to_fcc(PixelFormat pf, char* dst)
-    {
-        u32_to_fcc((u32)pf, dst);
-    }
-
-
-
-}
-
-
 /* types */
 
 namespace w32
 {
+    namespace cvt = convert;
+
     using Device_p = IMFActivate*;
     using MediaSource_p = IMFMediaSource*;
     using SourceReader_p = IMFSourceReader*;
@@ -166,7 +55,7 @@ namespace w32
         UINT32 fps = 0;
         //UINT32 pixel_size = 0;
 
-        PixelFormat pixel_format = PixelFormat::Unknown;
+        cvt::PixelFormat pixel_format = cvt::PixelFormat::Unknown;
         char format_code[5] = { 0 };
     };
 
@@ -217,6 +106,116 @@ namespace w32
     static void shutdown()
     {
         MFShutdown();
+    }
+
+
+    static bool activate(Device_p device, MediaSource_p& source, SourceReader_p& reader)
+    {
+        HRESULT hr = device->ActivateObject(__uuidof(IMFMediaSource), (void**)&source);
+        if (FAILED(hr))
+        {
+            return false;
+        }
+
+        hr = MFCreateSourceReaderFromMediaSource(source, NULL, &reader);
+        if (FAILED(hr))
+        {
+            release(source);
+            return false;
+        }
+
+        hr = reader->SetStreamSelection(MF_SOURCE_READER_FIRST_VIDEO_STREAM, TRUE);
+        if (FAILED(hr))
+        {
+            release(source);
+            release(reader);
+            return false;
+        }
+
+        Frame frame{};
+        Sample_p sample = nullptr;
+
+        hr = reader->ReadSample(
+            (DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, 
+            0, 
+            &frame.stream_index, 
+            &frame.flags, 
+            &frame.timestamp, 
+            &sample);
+
+        if (FAILED(hr))
+        {
+            release(source);
+            release(reader);
+            return false;
+        }
+
+        return true;
+    }
+        
+
+    static DataResult<FrameFormat> get_frame_format(SourceReader_p reader)
+    {
+        DataResult<FrameFormat> result{};
+        auto& format = result.data;
+
+        IMFMediaType* media_type = nullptr;
+
+        HRESULT hr = reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &media_type);
+        if (FAILED(hr))
+        {
+            return result;
+        }
+
+        GUID major_type;
+        hr = media_type->GetGUID(MF_MT_MAJOR_TYPE, &major_type);
+        if (FAILED(hr) || major_type != MFMediaType_Video)
+        {
+            release(media_type);
+            return result;
+        }
+
+        hr = MFGetAttributeSize(media_type, MF_MT_FRAME_SIZE, &format.width, &format.height);
+        if (FAILED(hr) || !format.width || ! format.height)
+        {
+            release(media_type);
+            return result;
+        }
+
+        hr = media_type->GetUINT32(MF_MT_DEFAULT_STRIDE, &format.stride);
+        if (FAILED(hr) || !format.stride)
+        {
+            //release(media_type);
+            //return result;
+        }
+
+        Bytes8 fps;
+
+        hr = media_type->GetUINT64(MF_MT_FRAME_RATE, &fps.val64);
+
+        if (FAILED(hr) || !fps.hi32 || !fps.lo32)
+        {
+            release(media_type);
+            return result;
+        }
+
+        format.fps = fps.hi32 / fps.lo32;
+        //format.pixel_size = format.stride / format.width;
+
+        GUID sub_type;
+        hr = media_type->GetGUID(MF_MT_SUBTYPE, &sub_type);
+        if (FAILED(hr))
+        {
+            release(media_type);
+            return result;
+        }
+
+        format.pixel_format = (cvt::PixelFormat)sub_type.Data1;
+        pf_to_fcc(format.pixel_format, format.format_code);
+
+        release(media_type);
+        result.success = true;
+        return result;
     }
 }
 
@@ -276,357 +275,10 @@ namespace w32
 }
 
 
-/* ? */
-
-namespace w32
-{
-    static bool activate(Device_p device, MediaSource_p& source, SourceReader_p& reader)
-    {
-        HRESULT hr = device->ActivateObject(__uuidof(IMFMediaSource), (void**)&source);
-        if (FAILED(hr))
-        {
-            return false;
-        }
-
-        hr = MFCreateSourceReaderFromMediaSource(source, NULL, &reader);
-        if (FAILED(hr))
-        {
-            release(source);
-            return false;
-        }
-
-        hr = reader->SetStreamSelection(MF_SOURCE_READER_FIRST_VIDEO_STREAM, TRUE);
-        if (FAILED(hr))
-        {
-            release(source);
-            release(reader);
-            return false;
-        }
-
-        Frame frame{};
-        Sample_p sample = nullptr;
-
-        hr = reader->ReadSample(
-            (DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, 
-            0, 
-            &frame.stream_index, 
-            &frame.flags, 
-            &frame.timestamp, 
-            &sample);
-
-        if (FAILED(hr))
-        {
-            release(source);
-            release(reader);
-            return false;
-        }
-
-        return true;
-    }
-
-
-    
-
-    static DataResult<FrameFormat> get_frame_format(SourceReader_p reader)
-    {
-        DataResult<FrameFormat> result{};
-        auto& format = result.data;
-
-        IMFMediaType* media_type = nullptr;
-
-        HRESULT hr = reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &media_type);
-        if (FAILED(hr))
-        {
-            return result;
-        }
-
-        GUID major_type;
-        hr = media_type->GetGUID(MF_MT_MAJOR_TYPE, &major_type);
-        if (FAILED(hr) || major_type != MFMediaType_Video)
-        {
-            release(media_type);
-            return result;
-        }
-
-        hr = MFGetAttributeSize(media_type, MF_MT_FRAME_SIZE, &format.width, &format.height);
-        if (FAILED(hr) || !format.width || ! format.height)
-        {
-            release(media_type);
-            return result;
-        }
-
-        hr = media_type->GetUINT32(MF_MT_DEFAULT_STRIDE, &format.stride);
-        if (FAILED(hr) || !format.stride)
-        {
-            //release(media_type);
-            //return result;
-        }
-
-        Bytes8 fps;
-
-        hr = media_type->GetUINT64(MF_MT_FRAME_RATE, &fps.val64);
-
-        if (FAILED(hr) || !fps.hi32 || !fps.lo32)
-        {
-            release(media_type);
-            return result;
-        }
-
-        format.fps = fps.hi32 / fps.lo32;
-        //format.pixel_size = format.stride / format.width;
-
-        GUID sub_type;
-        hr = media_type->GetGUID(MF_MT_SUBTYPE, &sub_type);
-        if (FAILED(hr))
-        {
-            release(media_type);
-            return result;
-        }
-
-        format.pixel_format = (PixelFormat)sub_type.Data1;
-        pf_to_fcc(format.pixel_format, format.format_code);
-
-        release(media_type);
-        result.success = true;
-        return result;
-    } 
-}
-
-
-#include "camera_usb.hpp"
-#include "mjpeg_convert.hpp"
-#include "../qsprintf/qsprintf.hpp"
-#include "../util/numeric.hpp"
-#include "../util/stopwatch.hpp"
-
-namespace convert
-{
-    namespace img = image;
-
-
-    static void mjpeg_to_rgba(w32::Frame& frame, img::ImageView const& dst)
-    {
-        auto format = mjpeg::image_format::RGBA8;
-
-        mjpeg::convert((u8*)frame.data, dst.width, (u32)frame.size_bytes, (u8*)dst.matrix_data_, format);
-    }
-
-
-    static void yuv_to_rgba(u8 y, u8 u, u8 v, img::Pixel* dst)
-    {
-        constexpr f32 yr = 1.0f;
-        constexpr f32 ur = 0.0f;
-        constexpr f32 vr = 1.13983f;
-
-        constexpr f32 yg = 1.0f;
-        constexpr f32 ug = -0.39465f;
-        constexpr f32 vg = -0.5806f;
-
-        constexpr f32 yb = 1.0f;
-        constexpr f32 ub = 2.03211f;
-        constexpr f32 vb = 0.0f;
-
-        constexpr f32 c = 1.0f / 255.0f;
-
-        auto yc = y * c;
-        auto uc = u * c - 0.5f;
-        auto vc = v * c - 0.5f;
-
-        auto r = num::clamp((yr * yc) + (ur * uc) + (vr * vc), 0.0f, 1.0f) * 255;
-        auto g = num::clamp((yg * yc) + (ug * uc) + (vg * vc), 0.0f, 1.0f) * 255;
-        auto b = num::clamp((yb * yc) + (ub * uc) + (vb * vc), 0.0f, 1.0f) * 255;
-
-        dst->red = num::round_to_unsigned<u8>(r);
-        dst->green = num::round_to_unsigned<u8>(g);
-        dst->blue = num::round_to_unsigned<u8>(b);
-        dst->alpha = 255;
-    }
-
-
-    static void yuyv_to_rgba(w32::Frame& frame, img::ImageView const& dst)
-    {
-        auto const len  = dst.width * dst.height;
-
-        auto yuyv = (u8*)frame.data;
-        auto d = dst.matrix_data_;
-
-        auto y1 = yuyv;
-        auto u = y1 + 1;
-        auto y2 = u + 1;
-        auto v = y2 + 1;
-
-        auto d1 = d;
-        auto d2 = d1 + 1;
-
-        for (u32 i = 0; i < len; i += 4)
-        {
-            yuv_to_rgba(*y1, *u, *v, d1);
-            yuv_to_rgba(*y2, *u, *v, d2);
-
-            y1 += 4;
-            u += 4;
-            y2 += 4;
-            v += 4;
-
-            d1 += 1;
-            d2 += 1;
-        }
-    }
-
-
-    static void yvyu_to_rgba(w32::Frame& frame, img::ImageView const& dst)
-    {
-        auto const len  = dst.width * dst.height;
-
-        auto yuyv = (u8*)frame.data;
-        auto d = dst.matrix_data_;
-
-        auto y1 = yuyv;
-        auto v = y1 + 1;
-        auto y2 = v + 1;
-        auto u = y2 + 1;
-
-        auto d1 = d;
-        auto d2 = d1 + 1;
-
-        for (u32 i = 0; i < len; i += 4)
-        {
-            yuv_to_rgba(*y1, *u, *v, d1);
-            yuv_to_rgba(*y2, *u, *v, d2);
-
-            y1 += 4;
-            v += 4;
-            y2 += 4;
-            u += 4;
-
-            d1 += 1;
-            d2 += 1;
-        }
-    }
-
-
-    static void uyvy_to_rgba(w32::Frame& frame, img::ImageView const& dst)
-    {
-        auto const len  = dst.width * dst.height;
-
-        auto uyvy = (u8*)frame.data;
-        auto d = dst.matrix_data_;
-
-        auto u = uyvy;
-        auto y1 = u + 1;
-        auto v = y1 + 1;
-        auto y2 = v + 1;
-
-        auto d1 = d;
-        auto d2 = d1 + 1;
-
-        for (u32 i = 0; i < len; i += 4)
-        {
-            yuv_to_rgba(*y1, *u, *v, d1);
-            yuv_to_rgba(*y2, *u, *v, d2);
-
-            y1 += 4;
-            v += 4;
-            y2 += 4;
-            u += 4;
-
-            d1 += 1;
-            d2 += 1;
-        }
-    }
-    
-    
-    static void nv12_to_rgba(w32::Frame& frame, img::ImageView const& dst)
-    {
-        auto const width = dst.width;
-        auto const height = dst.height;
-
-        assert(frame.size_bytes == width * height + width * height / 2);
-
-        auto sy = (u8*)frame.data;
-        auto suv = sy + width * height;
-        auto sd = dst.matrix_data_;
-
-        auto u = suv;
-        auto v = u + 1;        
-
-        for (u32 h = 0; h < height; h += 2)
-        {
-            auto y1 = sy + h * width;
-            auto y2 = y1 + 1;
-            auto y3 = y1 + width;
-            auto y4 = y3 + 1;
-
-            auto d1 = sd + h * width;
-            auto d2 = d1 + 1;
-            auto d3 = d1 + width;
-            auto d4 = d3 + 1;
-
-            for (u32 w = 0; w < width; w += 2)
-            {  
-                yuv_to_rgba(*y1, *u, *v, d1);
-                yuv_to_rgba(*y2, *u, *v, d2);
-                yuv_to_rgba(*y3, *u, *v, d3);
-                yuv_to_rgba(*y4, *u, *v, d4);
-
-                y1 += 2;
-                y2 += 2;
-                y3 += 2;
-                y4 += 2;
-
-                d1 += 2;
-                d2 += 2;
-                d3 += 2;
-                d4 += 2;
-
-                u += 2;
-                v += 2;
-            }
-        }
-    }
-
-}
-
-
-namespace convert
-{
-    using PF = w32::PixelFormat;
-
-
-    static void convert(w32::Frame& frame, img::ImageView const& dst, PF format)
-    {
-        switch (format)
-        {
-        case PF::YUY2:
-            yuyv_to_rgba(frame, dst);
-            break;
-        
-        case PF::YVYU:
-            yvyu_to_rgba(frame, dst);
-            break;
-        
-        case PF::UYVY:
-            uyvy_to_rgba(frame, dst);
-            break;
-
-        case PF::NV12:
-            nv12_to_rgba(frame, dst);
-            break;
-        
-        case PF::MJPG:
-            mjpeg_to_rgba(frame, dst);
-            break;
-
-        default:
-            img::fill(dst, img::to_pixel(100));
-        }
-    }
-}
-
-
 namespace camera_usb
 {
     namespace img = image;
+    namespace cvt = convert;
 
     constexpr u8 DEVICE_COUNT_MAX = 16;
 
@@ -705,8 +357,9 @@ namespace camera_usb
         }
 
         auto& frame = result.data;
+        auto span = span::make_view((u8*)frame.data, frame.size_bytes);
 
-        convert::convert(frame, device.rgba, device.format.pixel_format);
+        cvt::convert_view(span, device.rgba, device.format.pixel_format);
 
         w32::release(frame);
         w32::release(device.p_sample);
@@ -959,5 +612,4 @@ namespace camera_usb
 }
 
 
-#define MJPEG_CONVERT_IMPLEMENTATION
-#include "mjpeg_convert.hpp"
+#include "../image/convert.cpp"
