@@ -251,7 +251,7 @@ namespace convert
 
     static void span_yuyv_to_rgba(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
     {
-        auto const len  = dst.length;
+        auto const len  = src.length;
 
         auto yuyv = src.begin;
         auto d = dst.begin;
@@ -274,15 +274,15 @@ namespace convert
             y2 += 4;
             v += 4;
 
-            d1 += 1;
-            d2 += 1;
+            d1 += 2;
+            d2 += 2;
         }
     }
 
 
     static void span_uyvy_to_rgba(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
     {
-        auto const len  = dst.length;
+        auto const len  = src.length;
 
         auto uyvy = src.begin;
         auto d = dst.begin;
@@ -305,15 +305,15 @@ namespace convert
             y2 += 4;
             v += 4;
 
-            d1 += 1;
-            d2 += 1;
+            d1 += 2;
+            d2 += 2;
         }
     }
 
 
     static void span_yvyu_to_rgba(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
     {
-        auto const len  = dst.length;
+        auto const len  = src.length;
 
         auto yuyv = src.begin;
         auto d = dst.begin;
@@ -336,8 +336,8 @@ namespace convert
             y2 += 4;
             u += 4;
 
-            d1 += 1;
-            d2 += 1;
+            d1 += 2;
+            d2 += 2;
         }
     }
 }
@@ -355,7 +355,7 @@ namespace convert
 
     void yuyv_to_rgba(SpanView<u8> const& src , img::ImageView const& dst)
     {
-        assert(src.length == dst.width * dst.height);
+        //assert(src.length == dst.width * dst.height);
 
         span_yuyv_to_rgba(src, img::to_span(dst));
     }
