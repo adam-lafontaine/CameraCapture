@@ -14,77 +14,119 @@
 
 namespace w32
 {
-    enum class PixelFormat : int
+    constexpr u32 fcc_to_u32(cstr code)
     {
-        Unknown = -1,
+        u32 value = 0;
+        
+        for (u32 i = 0; i < 4; i++)
+        {
+            value |= (u8)code[i] << i * 8;
+        }
 
-        RGB32 = 1,
-        ARGB32 = 2,
-        RGB24 = 3,
-        RGB555 = 4,
-        RGB565 = 5,
-        RGB8 = 6,
-        L8 = 7,
-        L16 = 8,
-        D16 = 9,
-        AI44 = 10,
-        AYUV = 11,
-        YUYV = 12,
-        YVYU = 13,
-        YVU9 = 14,
-        UYVY = 15,
-        NV11 = 16,
-        NV12 = 17,
-        YV12 = 18,
-        I420 = 19,
-        IYUV = 20,
-        Y210 = 21,
-        Y216 = 22,
-        Y410 = 23,
-        Y416 = 24,
-        Y41P = 25,
-        Y41T = 26,
-        Y42T = 27,
-        P210 = 28,
-        P216 = 29,
-        P010 = 30,
-        P016 = 31,
-        v210 = 32,
-        v216 = 33,
-        v410 = 34,
-        MP43 = 35,
-        MP4S = 36,
-        M4S2 = 37,
-        MP4V = 38,
-        WMV1 = 39,
-        WMV2 = 40,
-        WMV3 = 41,
-        WVC1 = 42,
-        MSS1 = 43,
-        MSS2 = 44,
-        MPG1 = 45,
-        DVSL = 46,
-        DVSD = 47,
-        DVHD = 48,
-        DV25 = 49,
-        DV50 = 50,
-        DVH1 = 51,
-        DVC = 52,
-        H264 = 53,
-        H265 = 54,
-        MJPG = 55,
-        _420O = 56,
-        HEVC = 57,
-        HEVC_ES = 58,
-        VP80 = 59,
-        VP90 = 60,
-        ORAW = 61,
-        H263 = 62,
-        A2R10G10B10 = 63,
-        A16B16G16R16F = 64,
-        VP10 = 65,
-        AV1 = 66,
+        return value;
+    }
+
+
+    static void u32_to_fcc(u32 src, char* dst)
+    {
+        union
+        {
+            u32 value;
+            char fcc[4];
+        } sd;
+
+        sd.value = src;
+
+        for (u32 i = 0; i < 4; i++)
+        {
+            dst[i] = sd.fcc[i];
+        }
+    }
+
+
+    enum class PixelFormat : u32
+    {
+        RGB32  = 22, // D3DFMT_X8R8G8B8
+        ARGB32 = 21, // D3DFMT_A8R8G8B8
+        RGB24  = 20, // D3DFMT_R8G8B8
+        RGB555 = 25, // D3DFMT_X1R5G5B5
+        RGB565 = 23, // D3DFMT_R5G6B5
+        RGB8   = 41, // D3DFMT_P8
+        L8     = 50, // D3DFMT_L8
+        L16    = 81, // D3DFMT_L16
+        D16    = 80, // D3DFMT_D16
+
+        AI44 = fcc_to_u32("AI44"),
+        AYUV = fcc_to_u32("AYUV"),
+        YUY2 = fcc_to_u32("YUY2"),
+        YVYU = fcc_to_u32("YVYU"),
+        YVU9 = fcc_to_u32("YVU9"),
+        UYVY = fcc_to_u32("UYVY"),
+        NV11 = fcc_to_u32("NV11"),
+        NV12 = fcc_to_u32("NV12"),
+        YV12 = fcc_to_u32("YV12"),
+        I420 = fcc_to_u32("I420"),
+        IYUV = fcc_to_u32("IYUV"),
+        Y210 = fcc_to_u32("Y210"),
+        Y216 = fcc_to_u32("Y216"),
+        Y410 = fcc_to_u32("Y410"),
+        Y416 = fcc_to_u32("Y416"),
+        Y41P = fcc_to_u32("Y41P"),
+        Y41T = fcc_to_u32("Y41T"),
+        Y42T = fcc_to_u32("Y42T"),
+        P210 = fcc_to_u32("P210"),
+        P216 = fcc_to_u32("P216"),
+        P010 = fcc_to_u32("P010"),
+        P016 = fcc_to_u32("P016"),
+        v210 = fcc_to_u32("v210"),
+        v216 = fcc_to_u32("v216"),
+        v410 = fcc_to_u32("v410"),
+        MP43 = fcc_to_u32("MP43"),
+        MP4S = fcc_to_u32("MP4S"),
+        M4S2 = fcc_to_u32("M4S2"),
+        MP4V = fcc_to_u32("MP4V"),
+        WMV1 = fcc_to_u32("WMV1"),
+        WMV2 = fcc_to_u32("WMV2"),
+        WMV3 = fcc_to_u32("WMV3"),
+        WVC1 = fcc_to_u32("WVC1"),
+        MSS1 = fcc_to_u32("MSS1"),
+        MSS2 = fcc_to_u32("MSS2"),
+        MPG1 = fcc_to_u32("MPG1"),
+        DVSL = fcc_to_u32("dvsl"),
+        DVSD = fcc_to_u32("dvsd"),
+        DVHD = fcc_to_u32("dvhd"),
+        DV25 = fcc_to_u32("dv25"),
+        DV50 = fcc_to_u32("dv50"),
+        DVH1 = fcc_to_u32("dvh1"),
+        DVC  = fcc_to_u32("dvc "),
+        H264 = fcc_to_u32("H264"),
+        H265 = fcc_to_u32("H265"),
+        MJPG = fcc_to_u32("MJPG"),
+        _420O = fcc_to_u32("420O"),
+        HEVC = fcc_to_u32("HEVC"),
+        HEVC_ES = fcc_to_u32("HEVS"),
+        VP80 = fcc_to_u32("VP80"),
+        VP90 = fcc_to_u32("VP90"),
+        ORAW = fcc_to_u32("ORAW"),
+        H263 = fcc_to_u32("H263"),
+
+        A2R10G10B10   = 31,  // D3DFMT_A2B10G10R10
+        A16B16G16R16F = 113, // D3DFMT_A16B16G16R16F
+
+        VP10 = fcc_to_u32("VP10"),
+        AV1 = fcc_to_u32("AV01"),
+
+        Unknown = fcc_to_u32("XXXX")
     };
+
+
+    static void pf_to_fcc(PixelFormat pf, char* dst)
+    {
+        u32_to_fcc((u32)pf, dst);
+    }
+
+
+
 }
 
 
@@ -125,6 +167,7 @@ namespace w32
         //UINT32 pixel_size = 0;
 
         PixelFormat pixel_format = PixelFormat::Unknown;
+        char format_code[5] = { 0 };
     };
 
 
@@ -282,6 +325,8 @@ namespace w32
     }
 
 
+    
+
     static DataResult<FrameFormat> get_frame_format(SourceReader_p reader)
     {
         DataResult<FrameFormat> result{};
@@ -338,80 +383,8 @@ namespace w32
             return result;
         }
 
-        if (sub_type == MFVideoFormat_RGB32) { format.pixel_format = PixelFormat::RGB32; }
-        else if(sub_type == MFVideoFormat_ARGB32) { format.pixel_format = PixelFormat::ARGB32; }
-        else if(sub_type == MFVideoFormat_RGB24)  { format.pixel_format = PixelFormat::RGB24; }
-        else if(sub_type == MFVideoFormat_RGB555) { format.pixel_format = PixelFormat::RGB555; }
-        else if(sub_type == MFVideoFormat_RGB565) { format.pixel_format = PixelFormat::RGB565; }
-        else if(sub_type == MFVideoFormat_RGB8)   { format.pixel_format = PixelFormat::RGB8; }
-        else if(sub_type == MFVideoFormat_L8)     { format.pixel_format = PixelFormat::L8; }
-        else if(sub_type == MFVideoFormat_L16)  { format.pixel_format = PixelFormat::L16; }
-        else if(sub_type == MFVideoFormat_D16)  { format.pixel_format = PixelFormat::D16; }
-        else if(sub_type == MFVideoFormat_AI44) { format.pixel_format = PixelFormat::AI44; }
-        else if(sub_type == MFVideoFormat_AYUV) { format.pixel_format = PixelFormat::AYUV; }
-        else if(sub_type == MFVideoFormat_YUY2) { format.pixel_format = PixelFormat::YUYV; }
-        else if(sub_type == MFVideoFormat_YVYU) { format.pixel_format = PixelFormat::YVYU; }
-        else if(sub_type == MFVideoFormat_YVU9) { format.pixel_format = PixelFormat::YVU9; }
-        else if(sub_type == MFVideoFormat_UYVY) { format.pixel_format = PixelFormat::UYVY; }
-        else if(sub_type == MFVideoFormat_NV11) { format.pixel_format = PixelFormat::NV11; }
-        else if(sub_type == MFVideoFormat_NV12) { format.pixel_format = PixelFormat::NV12; }
-        else if(sub_type == MFVideoFormat_YV12) { format.pixel_format = PixelFormat::YV12; }
-        else if(sub_type == MFVideoFormat_I420) { format.pixel_format = PixelFormat::I420; }
-        else if(sub_type == MFVideoFormat_IYUV) { format.pixel_format = PixelFormat::IYUV; }
-        else if(sub_type == MFVideoFormat_Y210) { format.pixel_format = PixelFormat::Y210; }
-        else if(sub_type == MFVideoFormat_Y216) { format.pixel_format = PixelFormat::Y216; }
-        else if(sub_type == MFVideoFormat_Y410) { format.pixel_format = PixelFormat::Y410; }
-        else if(sub_type == MFVideoFormat_Y416) { format.pixel_format = PixelFormat::Y416; }
-        else if(sub_type == MFVideoFormat_Y41P) { format.pixel_format = PixelFormat::Y41P; }
-        else if(sub_type == MFVideoFormat_Y41T) { format.pixel_format = PixelFormat::Y41T; }
-        else if(sub_type == MFVideoFormat_Y42T) { format.pixel_format = PixelFormat::Y42T; }
-        else if(sub_type == MFVideoFormat_P210) { format.pixel_format = PixelFormat::P210; }
-        else if(sub_type == MFVideoFormat_P216) { format.pixel_format = PixelFormat::P216; }
-        else if(sub_type == MFVideoFormat_P010) { format.pixel_format = PixelFormat::P010; }
-        else if(sub_type == MFVideoFormat_P016) { format.pixel_format = PixelFormat::P016; }
-        else if(sub_type == MFVideoFormat_v210) { format.pixel_format = PixelFormat::v210; }
-        else if(sub_type == MFVideoFormat_v216) { format.pixel_format = PixelFormat::v216; }
-        else if(sub_type == MFVideoFormat_v410) { format.pixel_format = PixelFormat::v410; }
-        else if(sub_type == MFVideoFormat_MP43) { format.pixel_format = PixelFormat::MP43; }
-        else if(sub_type == MFVideoFormat_MP4S) { format.pixel_format = PixelFormat::MP4S; }
-        else if(sub_type == MFVideoFormat_M4S2) { format.pixel_format = PixelFormat::M4S2; }
-        else if(sub_type == MFVideoFormat_MP4V) { format.pixel_format = PixelFormat::MP4V; }
-        else if(sub_type == MFVideoFormat_WMV1) { format.pixel_format = PixelFormat::WMV1; }
-        else if(sub_type == MFVideoFormat_WMV2) { format.pixel_format = PixelFormat::WMV2; }
-        else if(sub_type == MFVideoFormat_WMV3) { format.pixel_format = PixelFormat::WMV3; }
-        else if(sub_type == MFVideoFormat_WVC1) { format.pixel_format = PixelFormat::WVC1; }
-        else if(sub_type == MFVideoFormat_MSS1) { format.pixel_format = PixelFormat::MSS1; }
-        else if(sub_type == MFVideoFormat_MSS2) { format.pixel_format = PixelFormat::MSS2; }
-        else if(sub_type == MFVideoFormat_MPG1) { format.pixel_format = PixelFormat::MPG1; }
-        else if(sub_type == MFVideoFormat_DVSL) { format.pixel_format = PixelFormat::DVSL; }
-        else if(sub_type == MFVideoFormat_DVSD) { format.pixel_format = PixelFormat::DVSD; }
-        else if(sub_type == MFVideoFormat_DVHD) { format.pixel_format = PixelFormat::DVHD; }
-        else if(sub_type == MFVideoFormat_DV25) { format.pixel_format = PixelFormat::DV25; }
-        else if(sub_type == MFVideoFormat_DV50) { format.pixel_format = PixelFormat::DV50; }
-        else if(sub_type == MFVideoFormat_DVH1) { format.pixel_format = PixelFormat::DVH1; }
-        else if(sub_type == MFVideoFormat_DVC)  { format.pixel_format = PixelFormat::DVC; }
-        else if(sub_type == MFVideoFormat_H264) { format.pixel_format = PixelFormat::H264; }
-        else if(sub_type == MFVideoFormat_H265) { format.pixel_format = PixelFormat::H265; }
-        else if(sub_type == MFVideoFormat_MJPG) { format.pixel_format = PixelFormat::MJPG; }
-        else if(sub_type == MFVideoFormat_420O) { format.pixel_format = PixelFormat::_420O; }
-        else if(sub_type == MFVideoFormat_HEVC) { format.pixel_format = PixelFormat::HEVC; }
-        else if(sub_type == MFVideoFormat_HEVC_ES) { format.pixel_format = PixelFormat::HEVC_ES; }
-        else if(sub_type == MFVideoFormat_VP80)    { format.pixel_format = PixelFormat::VP80; }
-        else if(sub_type == MFVideoFormat_VP90)    { format.pixel_format = PixelFormat::VP90; }
-        else if(sub_type == MFVideoFormat_ORAW)    { format.pixel_format = PixelFormat::ORAW; }
-#if (WINVER >= _WIN32_WINNT_WIN8)
-        else if (sub_type == MFVideoFormat_H263) { format.pixel_format = PixelFormat::H263; }
-#endif // (WINVER >= _WIN32_WINNT_WIN8)
-
-#if (WDK_NTDDI_VERSION >= NTDDI_WIN10)
-        else if (sub_type == MFVideoFormat_A2R10G10B10) { format.pixel_format = PixelFormat::A2R10G10B10; }
-        else if (sub_type == MFVideoFormat_A16B16G16R16F) { format.pixel_format = PixelFormat::A16B16G16R16F; }
-#endif
-
-#if (WDK_NTDDI_VERSION >= NTDDI_WIN10_RS3)
-        else if (sub_type == MFVideoFormat_VP10) { format.pixel_format = PixelFormat::VP10; }
-        else if (sub_type == MFVideoFormat_AV1) { format.pixel_format = PixelFormat::AV1; }
-#endif
+        format.pixel_format = (PixelFormat)sub_type.Data1;
+        pf_to_fcc(format.pixel_format, format.format_code);
 
         release(media_type);
         result.success = true;
@@ -422,6 +395,7 @@ namespace w32
 
 #include "camera_usb.hpp"
 #include "mjpeg_convert.hpp"
+#include "../qsprintf/qsprintf.hpp"
 #include "../util/numeric.hpp"
 #include "../util/stopwatch.hpp"
 
@@ -623,7 +597,7 @@ namespace convert
     {
         switch (format)
         {
-        case PF::YUYV:
+        case PF::YUY2:
             yuyv_to_rgba(frame, dst);
             break;
         
@@ -643,8 +617,8 @@ namespace convert
             mjpeg_to_rgba(frame, dst);
             break;
 
-
-        default: img::fill(dst, img::to_pixel(100));
+        default:
+            img::fill(dst, img::to_pixel(100));
         }
     }
 }
@@ -700,8 +674,6 @@ namespace camera_usb
         w32::release(device.p_source);
         w32::release(device.p_reader);
         w32::release(device.p_device);
-
-        //device.format; ???
     }
 
 
@@ -929,11 +901,8 @@ namespace camera_usb
         camera.frame_width = format.width;
         camera.frame_height = format.height;
         camera.fps = format.fps;
-
-        camera.fps = (u32)format.pixel_format;
-
-        // TODO
-        //camera.format = span::to_string_view(config.format_code);
+        
+        camera.format = span::to_string_view(format.format_code);
 
         // only one at a time
         mb::reset_buffer(w32_list.rgba_data);
