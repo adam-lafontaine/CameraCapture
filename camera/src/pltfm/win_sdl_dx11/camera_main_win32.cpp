@@ -376,7 +376,7 @@ static bool main_init()
     camera_state.display = img::make_view(w, h, camera_buffer);
     img::fill(camera_state.display, img::to_pixel(128));
 
-    cdsp::init_async(camera_state);    
+    cdsp::init_async(camera_state);
 
     if (!idsp::init(io_state))
     {

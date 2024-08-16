@@ -365,16 +365,9 @@ namespace image
     using ViewRGBu8 = View3u8;
 
 
-    enum class RGB : int
-	{
-		R = 0, G = 1, B = 2
-	};
+    enum class RGB : int { R = 0, G = 1, B = 2 };
 
-
-	enum class RGBA : int
-	{
-		R = 0, G = 1, B = 2, A = 3
-	};
+	enum class RGBA : int {	R = 0, G = 1, B = 2, A = 3 };
 
 
     template <typename T, u32 C>

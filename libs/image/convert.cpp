@@ -5,17 +5,6 @@
 #include <jpeglib.h>
 
 
-/* pixel format */
-
-namespace convert
-{  
-   
-
-
-    
-}
-
-
 namespace mjpeg
 {
     enum class image_format : int
@@ -218,6 +207,100 @@ namespace mjpeg
 
 namespace convert
 {
+    using ViewYUV = img::View3u8;
+
+    enum class YUV : int { Y = 0, U = 1, V = 2 };
+
+
+    struct YUYV
+    {
+        u8 y1;
+        u8 u;
+        u8 y2;
+        u8 v;
+    };
+
+
+    struct UYVY
+    {
+        u8 u;
+        u8 y1;
+        u8 v;
+        u8 y2;
+    };
+
+
+    struct YVYU
+    {
+        u8 y1;
+        u8 v;
+        u8 y2;
+        u8 u;
+    };
+
+
+    template <typename T>
+    static void yuv4_to_planar(SpanView<u8> const& src, ViewYUV const& dst)
+    {
+        auto const len  = src.length / 4;
+
+        auto yuyv = (T*)src.begin;
+
+        auto dy1 = dst.channel_data[(int)YUV::Y];
+        auto du1 = dst.channel_data[(int)YUV::U];
+        auto dv1 = dst.channel_data[(int)YUV::V];
+
+        auto dy2 = dy1 + 1;
+        auto du2 = du1 + 1;
+        auto dv2 = dv1 + 1;
+
+        for (u32 i = 0; i < len; i++)
+        {
+            auto s = yuyv[i];
+            *dy1 = s.y1;            
+            *dy2 = s.y2;
+
+            *du1 = *du2 = s.u;
+            *dv1 = *dv2 = s.v;
+
+            dy1 += 2;
+            du1 += 2;
+            dv1 += 2;
+
+            dy2 += 2;
+            du2 += 2;
+            dv2 += 2;
+        }
+    }
+
+
+    static void yuyv_to_planar(SpanView<u8> const& src, ViewYUV const& dst)
+    {
+        
+
+        yuv4_to_planar<YUYV>(src, dst);
+    }
+
+
+    static void uyvy_to_planar(SpanView<u8> const& src, ViewYUV const& dst)
+    {
+        
+        
+        yuv4_to_planar<UYVY>(src, dst);
+    }
+
+
+    static void yvyu_to_planar(SpanView<u8> const& src, ViewYUV const& dst)
+    {
+        
+
+        yuv4_to_planar<YVYU>(src, dst);
+    }
+}
+
+
+namespace convert
+{
     static void yuv_to_rgba(u8 y, u8 u, u8 v, img::Pixel* dst)
     {
         constexpr f32 yr = 1.0f;
@@ -249,92 +332,22 @@ namespace convert
     }
 
 
-    static void span_yuyv_to_rgba(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
+    template <typename T>
+    static void span_yuv4_to_pixel(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
     {
-        auto const len  = src.length;
+        auto const len  = src.length / 4;
 
-        auto yuyv = src.begin;
-        auto d = dst.begin;
+        auto yuyv = (T*)src.begin;
 
-        auto y1 = yuyv;
-        auto u = y1 + 1;
-        auto y2 = u + 1;
-        auto v = y2 + 1;
-
-        auto d1 = d;
+        auto d1 = dst.begin;
         auto d2 = d1 + 1;
 
-        for (u32 i = 0; i < len; i += 4)
+        for (u32 i = 0; i < len; i++)
         {
-            yuv_to_rgba(*y1, *u, *v, d1);
-            yuv_to_rgba(*y2, *u, *v, d2);
+            auto s = yuyv[i];
 
-            y1 += 4;
-            u += 4;
-            y2 += 4;
-            v += 4;
-
-            d1 += 2;
-            d2 += 2;
-        }
-    }
-
-
-    static void span_uyvy_to_rgba(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
-    {
-        auto const len  = src.length;
-
-        auto uyvy = src.begin;
-        auto d = dst.begin;
-
-        auto y1 = uyvy;
-        auto v = y1 + 1;
-        auto y2 = v + 1;
-        auto u = y2 + 1;
-
-        auto d1 = d;
-        auto d2 = d1 + 1;
-
-        for (u32 i = 0; i < len; i += 4)
-        {
-            yuv_to_rgba(*y1, *u, *v, d1);
-            yuv_to_rgba(*y2, *u, *v, d2);
-
-            y1 += 4;
-            u += 4;
-            y2 += 4;
-            v += 4;
-
-            d1 += 2;
-            d2 += 2;
-        }
-    }
-
-
-    static void span_yvyu_to_rgba(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
-    {
-        auto const len  = src.length;
-
-        auto yuyv = src.begin;
-        auto d = dst.begin;
-
-        auto y1 = yuyv;
-        auto v = y1 + 1;
-        auto y2 = v + 1;
-        auto u = y2 + 1;
-
-        auto d1 = d;
-        auto d2 = d1 + 1;
-
-        for (u32 i = 0; i < len; i += 4)
-        {
-            yuv_to_rgba(*y1, *u, *v, d1);
-            yuv_to_rgba(*y2, *u, *v, d2);
-
-            y1 += 4;
-            v += 4;
-            y2 += 4;
-            u += 4;
+            yuv_to_rgba(s.y1, s.u, s.v, d1);
+            yuv_to_rgba(s.y2, s.u, s.v, d2);
 
             d1 += 2;
             d2 += 2;
@@ -353,11 +366,11 @@ namespace convert
     }
 
 
-    void yuyv_to_rgba(SpanView<u8> const& src , img::ImageView const& dst)
+    void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
     {
         //assert(src.length == dst.width * dst.height);
 
-        span_yuyv_to_rgba(src, img::to_span(dst));
+        span_yuv4_to_pixel<YUYV>(src, img::to_span(dst));
     }
 
 
@@ -369,7 +382,7 @@ namespace convert
 
         for (u32 y = 0; y < dst.height; y++)
         {
-            span_yuyv_to_rgba(span::sub_view(src, y * w, w), img::row_span(dst, y));
+            span_yuv4_to_pixel<YUYV>(span::sub_view(src, y * w, w), img::row_span(dst, y));
         }
     }
 
@@ -378,7 +391,7 @@ namespace convert
     {
         assert(src.length == dst.width * dst.height);
 
-        span_yvyu_to_rgba(src, img::to_span(dst));
+        span_yuv4_to_pixel<YVYU>(src, img::to_span(dst));
     }
 
 
@@ -390,7 +403,7 @@ namespace convert
 
         for (u32 y = 0; y < dst.height; y++)
         {
-            span_yvyu_to_rgba(span::sub_view(src, y * w, w), img::row_span(dst, y));
+            span_yuv4_to_pixel<YVYU>(span::sub_view(src, y * w, w), img::row_span(dst, y));
         }
     }
 
@@ -399,7 +412,7 @@ namespace convert
     {
         assert(src.length == dst.width * dst.height);
 
-        span_uyvy_to_rgba(src, img::to_span(dst));
+        span_yuv4_to_pixel<UYVY>(src, img::to_span(dst));
     }
 
 
@@ -411,7 +424,7 @@ namespace convert
 
         for (u32 y = 0; y < dst.height; y++)
         {
-            span_uyvy_to_rgba(span::sub_view(src, y * w, w), img::row_span(dst, y));
+            span_yuv4_to_pixel<UYVY>(span::sub_view(src, y * w, w), img::row_span(dst, y));
         }
     }
     
@@ -428,7 +441,7 @@ namespace convert
         auto sd = dst.matrix_data_;
 
         auto u = suv;
-        auto v = u + 1;        
+        auto v = u + 1;
 
         for (u32 h = 0; h < height; h += 2)
         {
