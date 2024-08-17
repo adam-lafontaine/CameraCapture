@@ -403,7 +403,6 @@ namespace convert
         };
 
         static_assert(N % 2 == 0);
-        static_assert(sizeof(T) == 4);
 
         constexpr u32 N2 = N / 2;
         constexpr u32 NN = N * N;
@@ -616,25 +615,39 @@ namespace convert
     }
 
 
-    template <typename T>
-    static void span_yuv4_to_pixel(SpanView<u8> const& src, SpanView<img::Pixel> const& dst)
+    class OffsetYUYV
     {
-        auto const len  = src.length / 4;
+    public:
+        u8 y1;
+        u8 y2;
+        u8 u;
+        u8 v;
+    };
 
-        auto yuyv = (T*)src.begin;
+
+    static void span_yuv4_to_pixel(SpanView<u8> const& src, SpanView<img::Pixel> const& dst, OffsetYUYV yuyv)
+    {
+        auto const len  = src.length;
+
+        auto s = src.begin;
 
         auto d1 = dst.begin;
         auto d2 = d1 + 1;
 
-        for (u32 i = 0; i < len; i++)
-        {
-            auto s = yuyv[i];
+        auto y1 = yuyv.y1;
+        auto y2 = yuyv.y2;
+        auto u = yuyv.u;
+        auto v = yuyv.v;
 
-            yuv_to_rgba(s.y1, s.u, s.v, d1);
-            yuv_to_rgba(s.y2, s.u, s.v, d2);
+        for (u32 i = 0; i < len; i += 4)
+        {
+            yuv_to_rgba(s[y1], s[u], s[v], d1);
+            yuv_to_rgba(s[y2], s[u], s[v], d2);
 
             d1 += 2;
             d2 += 2;
+
+            s += 4;
         }
     }
 
@@ -653,63 +666,99 @@ namespace convert
 
     void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
     {
-        assert(src.length == dst.width * dst.height);
+        assert(src.length == dst.width * dst.height * 2);
 
-        span_yuv4_to_pixel<YUYV>(src, img::to_span(dst));
+        OffsetYUYV yuyv{};
+        yuyv.y1 = 0;
+        yuyv.u = 1;
+        yuyv.y2 = 2;
+        yuyv.v = 3;
+
+        span_yuv4_to_pixel(src, img::to_span(dst), yuyv);
     }
 
 
     void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
     {
-        assert(src.length == dst.width * dst.height);
+        assert(src.length == dst.width * dst.height * 2);
+
+        OffsetYUYV yuyv{};
+        yuyv.y1 = 0;
+        yuyv.u = 1;
+        yuyv.y2 = 2;
+        yuyv.v = 3;
 
         auto const w = dst.width;
 
         for (u32 y = 0; y < dst.height; y++)
         {
-            span_yuv4_to_pixel<YUYV>(span::sub_view(src, y * w, w), img::row_span(dst, y));
+            span_yuv4_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
         }
     }
 
 
     void yvyu_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
     {
-        assert(src.length == dst.width * dst.height);
+        assert(src.length == dst.width * dst.height * 2);
 
-        span_yuv4_to_pixel<YVYU>(src, img::to_span(dst));
+        OffsetYUYV yuyv{};
+        yuyv.y1 = 0;
+        yuyv.v = 1;
+        yuyv.y2 = 2;
+        yuyv.u = 3;
+
+        span_yuv4_to_pixel(src, img::to_span(dst), yuyv);
     }
 
 
     void yvyu_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
     {
-        assert(src.length == dst.width * dst.height);
+        assert(src.length == dst.width * dst.height * 2);
+
+        OffsetYUYV yuyv{};
+        yuyv.y1 = 0;
+        yuyv.v = 1;
+        yuyv.y2 = 2;
+        yuyv.u = 3;
 
         auto const w = dst.width;
 
         for (u32 y = 0; y < dst.height; y++)
         {
-            span_yuv4_to_pixel<YVYU>(span::sub_view(src, y * w, w), img::row_span(dst, y));
+            span_yuv4_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
         }
     }
 
 
     void uyvy_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
     {
-        assert(src.length == dst.width * dst.height);
+        assert(src.length == dst.width * dst.height * 2);
 
-        span_yuv4_to_pixel<UYVY>(src, img::to_span(dst));
+        OffsetYUYV yuyv{};
+        yuyv.u = 0;
+        yuyv.y1 = 1;
+        yuyv.v = 2;
+        yuyv.y2 = 3;
+
+        span_yuv4_to_pixel(src, img::to_span(dst), yuyv);
     }
 
 
     void uyvy_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
     {
-        assert(src.length == dst.width * dst.height);
+        assert(src.length == dst.width * dst.height * 2);
+
+        OffsetYUYV yuyv{};
+        yuyv.u = 0;
+        yuyv.y1 = 1;
+        yuyv.v = 2;
+        yuyv.y2 = 3;
 
         auto const w = dst.width;
 
         for (u32 y = 0; y < dst.height; y++)
         {
-            span_yuv4_to_pixel<UYVY>(span::sub_view(src, y * w, w), img::row_span(dst, y));
+            span_yuv4_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
         }
     }
     
@@ -810,6 +859,114 @@ namespace convert
                 u += 2;
                 v += 2;
             }
+        }
+    }
+}
+
+
+namespace convert
+{
+    PixelFormat validate_format(u32 src_len, u32 width, u32 height, PixelFormat format)
+    {
+        using PF = PixelFormat;
+
+        u32 is_valid = 0;
+
+        switch (format)
+        {
+        case PF::YUYV:
+        case PF::YUNV:
+        case PF::YUY2:
+        case PF::YVYU:
+        case PF::UYVY:
+        case PF::Y422:
+        case PF::UYNV:
+        case PF::HDYC:
+            is_valid = src_len == width * height * 2;
+            break;
+        
+        case PF::NV12:
+            is_valid = src_len == width * height + width * height / 2;
+            break;
+
+        case PF::MJPG:
+            is_valid = 1;
+            break;
+
+        default:
+            break;
+        }
+
+        return (PF)(is_valid * (u32)format);
+    }
+    
+    
+    void convert_view(SpanView<u8> const& src, img::ImageView const& dst, PixelFormat format)
+    {
+        using PF = PixelFormat;
+
+        switch (format)
+        {
+        case PF::YUYV:
+        case PF::YUNV:
+        case PF::YUY2:
+            yuyv_to_rgba(src, dst);
+            break;
+        
+        case PF::YVYU:
+            yvyu_to_rgba(src, dst);
+            break;
+        
+        case PF::UYVY:
+        case PF::Y422:
+        case PF::UYNV:
+        case PF::HDYC:
+            uyvy_to_rgba(src, dst);
+            break;
+
+        case PF::NV12:
+            nv12_to_rgba(src, dst);
+            break;
+        
+        case PF::MJPG:
+            mjpeg_to_rgba(src, dst);
+            break;
+
+        default:
+            img::fill(dst, img::to_pixel(100));
+        }
+    }
+
+
+    void convert_sub_view(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format)
+    {
+        using PF = PixelFormat;
+
+        switch (format)
+        {
+        case PF::YUYV:
+        case PF::YUNV:
+        case PF::YUY2:
+            yuyv_to_rgba(src, dst);
+            break;
+        
+        case PF::YVYU:
+            yvyu_to_rgba(src, dst);
+            break;
+        
+        case PF::UYVY:
+        case PF::Y422:
+        case PF::UYNV:
+        case PF::HDYC:
+            uyvy_to_rgba(src, dst);
+            break;
+
+        case PF::NV12:
+            nv12_to_rgba(src, dst);
+            break;
+
+        default:
+            img::fill(dst, img::to_pixel(100));
         }
     }
 }

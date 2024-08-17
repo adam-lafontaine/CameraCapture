@@ -97,7 +97,8 @@ namespace convert
         VP10 = fcc_to_u32("VP10"),
         AV1 = fcc_to_u32("AV01"),
 
-        Unknown = fcc_to_u32("XXXX")
+        Unknown = fcc_to_u32("XXXX"),
+        Invalid = 0
     };
 
 
@@ -121,97 +122,11 @@ namespace convert
 
 namespace convert
 {
-    namespace img = image; 
+    namespace img = image;
 
+    PixelFormat validate_format(u32 src_len, u32 width, u32 height, PixelFormat format);
 
-    void mjpeg_to_rgba(SpanView<u8> const& src, img::ImageView const& dst);
+    void convert_view(SpanView<u8> const& src, img::ImageView const& dst, PixelFormat format);
 
-    void yuyv_to_rgba(SpanView<u8> const& src , img::ImageView const& dst);
-
-    void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst);
-
-    void yvyu_to_rgba(SpanView<u8> const& src, img::ImageView const& dst);
-
-    void yvyu_to_rgba(SpanView<u8> const& src, img::SubView const& dst);
-
-    void uyvy_to_rgba(SpanView<u8> const& src, img::ImageView const& dst);
-
-    void uyvy_to_rgba(SpanView<u8> const& src, img::SubView const& dst);    
-    
-    void nv12_to_rgba(SpanView<u8> const& src, img::ImageView const& dst);
-
-    void nv12_to_rgba(SpanView<u8> const& src, img::SubView const& dst);
-}
-
-
-namespace convert
-{
-    void convert_view(SpanView<u8> const& src, img::ImageView const& dst, PixelFormat format)
-    {
-        using PF = PixelFormat;
-
-        switch (format)
-        {
-        case PF::YUYV:
-        case PF::YUNV:
-        case PF::YUY2:
-            yuyv_to_rgba(src, dst);
-            break;
-        
-        case PF::YVYU:
-            yvyu_to_rgba(src, dst);
-            break;
-        
-        case PF::UYVY:
-        case PF::Y422:
-        case PF::UYNV:
-        case PF::HDYC:
-            uyvy_to_rgba(src, dst);
-            break;
-
-        case PF::NV12:
-            nv12_to_rgba(src, dst);
-            break;
-        
-        case PF::MJPG:
-            mjpeg_to_rgba(src, dst);
-            break;
-
-        default:
-            img::fill(dst, img::to_pixel(100));
-        }
-    }
-
-
-    inline void convert_sub_view(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format)
-    {
-        using PF = PixelFormat;
-
-        switch (format)
-        {
-        case PF::YUYV:
-        case PF::YUNV:
-        case PF::YUY2:
-            yuyv_to_rgba(src, dst);
-            break;
-        
-        case PF::YVYU:
-            yvyu_to_rgba(src, dst);
-            break;
-        
-        case PF::UYVY:
-        case PF::Y422:
-        case PF::UYNV:
-        case PF::HDYC:
-            uyvy_to_rgba(src, dst);
-            break;
-
-        case PF::NV12:
-            nv12_to_rgba(src, dst);
-            break;
-
-        default:
-            img::fill(dst, img::to_pixel(100));
-        }
-    }
+    void convert_sub_view(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format);
 }
