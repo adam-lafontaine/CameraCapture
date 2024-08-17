@@ -207,7 +207,7 @@ namespace mjpeg
 
 namespace convert
 {
-    using ViewYUV = img::View3u8;
+    using ViewYUV = img::View3<f32>;
 
     enum class YUV : int { Y = 0, U = 1, V = 2 };
 
@@ -278,19 +278,16 @@ namespace convert
     static void yuv4_to_planar2(SpanView<u8> const& src, ViewYUV const& dst)
     {
         static_assert(N % 2 == 0);
-        static_assert(sizeof(T) == sizeof(img::Pixel));
+        static_assert(sizeof(T) == 4);
 
         constexpr u32 N2 = N / 2;
-
-        constexpr f32 iNSQ = 1.0f / (N * N);
-        
-        constexpr u32 iNSQ2 = 1.0f /(NSQ / 2);        
+        constexpr u32 NN = N * N;
+        constexpr f32 iNN = 1.0f / (NN);
 
         auto dw = dst.width;
         auto dh = dst.height;
 
-        auto sw = N * dw / 4;
-        auto sh = N * dh;
+        auto sw = dw / 2;
 
         auto syuyv = (T*)src.begin;
 
@@ -320,7 +317,7 @@ namespace convert
                     auto s = syuyv + sr * sw + sc;
                     for (u32 nc = 0; nc < N2; nc++)
                     {
-                        auto& yuyv = s[nc];
+                        auto yuyv = s[nc];
                         yf += yuyv.y1 + yuyv.y2;
                         uf += yuyv.u;
                         vf += yuyv.v;
@@ -329,9 +326,9 @@ namespace convert
                     sr++;
                 }
 
-                dy[i] = num::round_to_unsigned<u8>(yf * iNSQ);
-                du[i] = num::round_to_unsigned<u8>(uf * iNSQ2);
-                dy[i] = num::round_to_unsigned<u8>(vf * iNSQ2);
+                dy[i] = yf * iNN;
+                du[i] = uf * 2 * iNN;
+                dy[i] = vf * 2 * iNN;
 
                 i++;
             }
@@ -341,26 +338,27 @@ namespace convert
 
     void nv12_to_planar(SpanView<u8> const& src, ViewYUV const& dst)
     {
-        auto const width = dst.width;
-        auto const height = dst.height;
-
-        auto sy = src.begin;        
-
-        auto dy = dst.channel_data[(int)YUV::Y];
-        auto du = dst.channel_data[(int)YUV::U];
-        auto dv = dst.channel_data[(int)YUV::V];
-
-        auto len = width + height;
-
-        span::copy_span(span::make_view(sy, len), span::make_view(dy, len));
-
         struct UV
         {
             u8 u;
             u8 v;
         };
 
-        auto suv = (UV*)(sy + width * height);
+        auto width = dst.width;
+        auto height = dst.height;
+        auto len = width * height;
+
+        auto sy = src.begin;
+        auto suv = (UV*)(sy + len);
+
+        auto dy = dst.channel_data[(int)YUV::Y];
+        auto du = dst.channel_data[(int)YUV::U];
+        auto dv = dst.channel_data[(int)YUV::V];
+
+        for (u32 i = 0; i < len; i++)
+        {
+            dy[i] = (f32)sy[i];
+        }
 
         for (u32 h = 0; h < height; h += 2)
         {
@@ -390,6 +388,93 @@ namespace convert
                 dv2 += 2;
                 dv3 += 2;
                 dv4 += 2;
+            }
+        }
+    }
+
+
+    template <u32 N>
+    void nv12_to_planar2(SpanView<u8> const& src, ViewYUV const& dst)
+    {
+        struct UV
+        {
+            u8 u;
+            u8 v;
+        };
+
+        static_assert(N % 2 == 0);
+        static_assert(sizeof(T) == 4);
+
+        constexpr u32 N2 = N / 2;
+        constexpr u32 NN = N * N;
+        constexpr f32 iNN = 1.0f / (NN);
+
+        auto dw = dst.width;
+        auto dh = dst.height;
+
+        auto sy = src.begin;
+        auto suv = (UV*)(src.begin + dw * dh);
+
+        auto dy = dst.channel_data[(int)YUV::Y];
+        auto du = dst.channel_data[(int)YUV::U];
+        auto dv = dst.channel_data[(int)YUV::V];
+
+        u32 sw = dw; // src width;
+
+        u32 dr = 0; // dst row
+        u32 dc = 0; // dst column
+        u32 sr = 0; // src row
+        u32 sc = 0; // src column
+
+        f32 yf = 0.0f;
+        f32 uf = 0.0f;
+        f32 vf = 0.0f;
+
+        u32 i = 0;
+        for (; dr < dh; dr++)
+        {
+            for (; dc < dw; dc++)
+            {
+                sw = dw;
+                
+                yf = 0.0f;
+                sr = N * dr;
+                for (u32 nr = 0; nr < N; nr++)
+                {
+                    sc = N * dc;
+                    auto s = sy + sr * sw + sc;
+                    for (u32 nc = 0; nc < N; nc++)
+                    {                        
+                        yf += s[nc];
+                    }
+
+                    sr++;
+                }
+
+                sw = dw / 2;
+                
+                uf = vf = 0.0f;
+                sr = N2 * dr;
+                for (u32 nr = 0; nr < N2; nr++)
+                {
+                    sc = N2 * dc;
+                    auto s = suv + sr * sw + sc;
+                    for (u32 nc = 0; nc < N2; nc++)
+                    {
+                        auto uv = s[nc];
+                        uf += uv.u;
+                        vf += uv.v;
+                    }
+
+                    sr++;
+                }
+
+                dy[i] = num::round_to_unsigned<u8>(yf * iNN);
+
+                du[i] = num::round_to_unsigned<u8>(uf * 4 * iNN);
+                dy[i] = num::round_to_unsigned<u8>(vf * 4 * iNN);
+
+                i++;
             }
         }
     }
