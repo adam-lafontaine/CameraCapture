@@ -320,6 +320,7 @@ namespace camera_usb
         f32 grab_ms;
 
         img::ImageView rgba;
+        convert::ViewYUV yuv;
     };
 
 
@@ -332,7 +333,7 @@ namespace camera_usb
 
         u32 count = 0;
 
-        img::Buffer32 rgba_data;
+        img::Buffer32 data32;
     };
 }
 
@@ -378,6 +379,9 @@ namespace camera_usb
 
         auto& frame = result.data;
         auto span = span::make_view((u8*)frame.data, frame.size_bytes);
+
+        cvt::to_yuv(span, device.yuv, device.format.pixel_format);
+        cvt::yuv_to_rgba(device.yuv, device.rgba);
 
         cvt::convert_view(span, device.rgba, device.format.pixel_format);
 
@@ -506,9 +510,9 @@ namespace camera_usb
         CameraList cameras{};
         cameras.status = ConnectionStatus::Connecting;
 
-        auto n_pixels = WIDTH_MAX * HEIGHT_MAX;
-        w32_list.rgba_data = img::create_buffer32(n_pixels, "w32 rgba");
-        if (!w32_list.rgba_data.ok)
+        auto n_pixels = WIDTH_MAX * HEIGHT_MAX;        
+        w32_list.data32 = img::create_buffer32(4 * n_pixels, "w32 data32");
+        if (!w32_list.data32.ok)
         {
             cameras.count = 0;
             cameras.status = ConnectionStatus::Disconnected;
@@ -578,9 +582,18 @@ namespace camera_usb
         camera.format = span::to_string_view(format.format_code);
 
         // only one at a time
-        mb::reset_buffer(w32_list.rgba_data);
+        auto& buffer = w32_list.data32;
+        auto w = camera.frame_width;
+        auto h = camera.frame_height;
+        mb::reset_buffer(buffer);
+        device.rgba = img::make_view(w, h, buffer);
+        device.yuv = convert::make_view_yuv(w, h, buffer);
 
-        device.rgba = img::make_view(camera.frame_width, camera.frame_height, w32_list.rgba_data);
+        if (!buffer.ok)
+        {
+            camera.busy = 0;
+            return false;
+        }
 
         camera.status = CameraStatus::Open;
         camera.busy = 0;
