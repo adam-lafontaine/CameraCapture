@@ -409,6 +409,26 @@ namespace image
 }
 
 
+/* select_channel */
+
+namespace image
+{
+    template <typename T, u32 C>
+    inline MatrixView2D<T> select_channel(ChannelMatrix2D<T, C> const& src, u32 ch)
+    {
+        MatrixView2D<T> view{};
+
+        view.width = src.width;
+        view.height = src.height;
+
+        view.matrix_data_ = src.channel_data[ch];
+
+        return view;
+    }
+
+}
+
+
 /* sub_view */
 
 namespace image
