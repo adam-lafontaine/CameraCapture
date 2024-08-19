@@ -205,6 +205,8 @@ namespace mjpeg
 }
 
 
+/* yuyv_to_planar */
+
 namespace convert
 {
     enum class YUV : u32 { Y = 0, U = 1, V = 2 };
@@ -334,61 +336,7 @@ namespace convert
     }
 
 
-    void nv12_to_planar(SpanView<u8> const& src, ViewYUV const& dst)
-    {
-        struct UV
-        {
-            u8 u;
-            u8 v;
-        };
-
-        auto width = dst.width;
-        auto height = dst.height;
-        auto len = width * height;
-
-        auto sy = src.begin;
-        auto suv = (UV*)(sy + len);
-
-        auto dy = dst.channel_data[(int)YUV::Y];
-        auto du = dst.channel_data[(int)YUV::U];
-        auto dv = dst.channel_data[(int)YUV::V];
-
-        for (u32 i = 0; i < len; i++)
-        {
-            dy[i] = (f32)sy[i];
-        }
-
-        for (u32 h = 0; h < height; h += 2)
-        {
-            auto du1 = du + h * width;
-            auto du2 = du1 + 1;
-            auto du3 = du1 + width;
-            auto du4 = du3 + 1;
-
-            auto dv1 = dv + h * width;
-            auto dv2 = dv1 + 1;
-            auto dv3 = dv1 + width;
-            auto dv4 = dv3 + 1;
-
-            for (u32 w = 0; w < width; w += 2)
-            {  
-                *du1 = *du2 = *du3 = *du4 = suv->u;
-                *dv1 = *dv2 = *dv3 = *dv4 = suv->v;
-                
-                suv++;
-
-                du1 += 2;
-                du2 += 2;
-                du3 += 2;
-                du4 += 2;
-
-                dv1 += 2;
-                dv2 += 2;
-                dv3 += 2;
-                dv4 += 2;
-            }
-        }
-    }
+    
 
 
     template <u32 N>
@@ -889,7 +837,7 @@ namespace convert
 
 namespace convert
 {
-    void yuyv_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
+    static void yuyv_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
     {
         assert(src.length == dst.width * dst.height * 2);
 
@@ -903,7 +851,7 @@ namespace convert
     }
 
 
-    void yvyu_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
+    static void yvyu_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
     {
         assert(src.length == dst.width * dst.height * 2);
 
@@ -917,7 +865,7 @@ namespace convert
     }
 
 
-    void uyvy_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
+    static void uyvy_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
     {
         assert(src.length == dst.width * dst.height * 2);
 
@@ -928,6 +876,63 @@ namespace convert
         yuyv.y2 = 3;
 
         yuyv_to_planar(src, dst, yuyv);
+    }
+
+
+    static void nv12_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
+    {
+        struct UV
+        {
+            u8 u;
+            u8 v;
+        };
+
+        auto width = dst.width;
+        auto height = dst.height;
+        auto len = width * height;
+
+        auto sy = src.begin;
+        auto suv = (UV*)(sy + len);
+
+        auto dy = dst.channel_data[(int)YUV::Y];
+        auto du = dst.channel_data[(int)YUV::U];
+        auto dv = dst.channel_data[(int)YUV::V];
+
+        for (u32 i = 0; i < len; i++)
+        {
+            dy[i] = (f32)sy[i];
+        }
+
+        for (u32 h = 0; h < height; h += 2)
+        {
+            auto du1 = du + h * width;
+            auto du2 = du1 + 1;
+            auto du3 = du1 + width;
+            auto du4 = du3 + 1;
+
+            auto dv1 = dv + h * width;
+            auto dv2 = dv1 + 1;
+            auto dv3 = dv1 + width;
+            auto dv4 = dv3 + 1;
+
+            for (u32 w = 0; w < width; w += 2)
+            {  
+                *du1 = *du2 = *du3 = *du4 = suv->u;
+                *dv1 = *dv2 = *dv3 = *dv4 = suv->v;
+                
+                suv++;
+
+                du1 += 2;
+                du2 += 2;
+                du3 += 2;
+                du4 += 2;
+
+                dv1 += 2;
+                dv2 += 2;
+                dv3 += 2;
+                dv4 += 2;
+            }
+        }
     }
 }
 
@@ -1082,7 +1087,7 @@ namespace convert
             break;
 
         case PF::NV12:
-            //nv12_to_rgba(src, dst);
+            nv12_to_yuv(src, dst);
             break;
 
         default:
