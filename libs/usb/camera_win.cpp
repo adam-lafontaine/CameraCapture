@@ -380,10 +380,12 @@ namespace camera_usb
         auto& frame = result.data;
         auto span = span::make_view((u8*)frame.data, frame.size_bytes);
 
-        cvt::to_yuv(span, device.yuv, device.format.pixel_format);
-        cvt::yuv_to_rgba(device.yuv, device.rgba);
+        auto format = device.format.pixel_format;
+        auto w = device.format.width;
+        auto h = device.format.height;
 
-        cvt::convert_view(span, device.rgba, device.format.pixel_format);
+        cvt::to_yuv(span, w, h, device.yuv, format);
+        cvt::yuv_to_rgba(device.yuv, device.rgba);
 
         w32::release(frame);
         w32::release(device.p_sample);

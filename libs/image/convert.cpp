@@ -220,13 +220,23 @@ namespace convert
         u8 u;
         u8 v;
     };
+
+
+    struct UV
+    {
+        u8 u;
+        u8 v;
+    };
     
 
-    static void yuyv_to_planar(SpanView<u8> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
+    static void yuyv_to_planar(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
     {
-        auto const len  = src.length;
+        assert(src.width == dst.width);
+        assert(src.height == dst.height);
 
-        auto s = src.begin;
+        auto const len = src.width * src.height * 2;
+
+        auto s = (u8*)src.matrix_data_;
 
         auto y1 = yuyv.y1;
         auto y2 = yuyv.y2;
@@ -262,24 +272,20 @@ namespace convert
     }
     
 
-    static void yuyv_to_planar2(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
+    static void yuyv_to_planar(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv, u32 scale)
     {
         auto y1 = yuyv.y1;
         auto y2 = yuyv.y2;
         auto u = yuyv.u;
         auto v = yuyv.v;
 
-        auto sw = src.width;
-        auto sh = dst.width;
+        assert(scale == src.height / dst.height);
 
-        auto dw = dst.width;
-        auto dh = dst.height;
-
-        u32 const N = sh / dh;
+        u32 const N = scale;
 
         constexpr u32 N_MAX = 8;
 
-        assert(N == 1 || N % 2 == 0);
+        assert(N >= 2 || N % 2 == 0);
         assert(N <= N_MAX);
 
         u32 N2 = N / 2;
@@ -290,137 +296,168 @@ namespace convert
         auto du = img::select_channel(dst, (u32)YUV::U);
         auto dv = img::select_channel(dst, (u32)YUV::V);
 
-        auto sr = img::make_rect(N2, N);
-
-        u32 dr = 0; // dst row
-        u32 dc = 0; // dst column
+        auto srect = img::make_rect(N2, N);
 
         f32 yf = 0.0f;
         f32 uf = 0.0f;
         f32 vf = 0.0f;
         
-        for (dr = 0; dr < dh; dr++)
+        for (u32 h = 0; h < dst.height; h++)
         {
-            auto drow_y = img::row_begin(dy, dr);
-            auto drow_u = img::row_begin(du, dr);
-            auto drow_v = img::row_begin(dv, dr);
+            auto drow_y = img::row_begin(dy, h);
+            auto drow_u = img::row_begin(du, h);
+            auto drow_v = img::row_begin(dv, h);
 
-            for (dc = 0; dc < dw; dc++)
+            for (u32 w = 0; w < dst.width; w++)
             {
                 yf = uf = vf = 0.0f;
 
-                auto sview = img::sub_view(src, sr);
-                for (u32 y = 0; y < sview.height; y++)
+                auto sub = img::sub_view(src, srect);
+                for (u32 h = 0; h < sub.height; h++)
                 {
-                    auto srow = img::row_begin(sview, y);
-                    for (u32 x = 0; x < sview.width; x++)
+                    auto srow = img::row_begin(sub, h);
+                    for (u32 w = 0; w < sub.width; w++)
                     {
-                        auto s8 = (u8*)(srow + x);
+                        auto s8 = (u8*)(srow + w);
                         yf += s8[y1] + s8[y2];
                         uf += s8[u];
                         vf += s8[v];
                     }
                 }
 
-                drow_y[dc] = yf * iNN;
-                drow_u[dc] = uf * 2 * iNN;
-                drow_v[dc] = vf * 2 * iNN;
+                drow_y[w] = yf * iNN;
+                drow_u[w] = uf * 2 * iNN;
+                drow_v[w] = vf * 2 * iNN;
 
-                sr.x_begin += N2;
-                sr.x_end += N2;
+                srect.x_begin += N2;
+                srect.x_end += N2;
             }
 
-            sr.y_begin += N;
-            sr.y_end += N;
+            srect.y_begin += N;
+            srect.y_end += N;
         }
     }
 
 
-    
+    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<UV> const& src_uv, ViewYUV const& dst)
+    { 
+        auto width = dst.width;
+        auto height = dst.height;
+        auto len = width * height;
 
-
-    template <u32 N>
-    void nv12_to_planar2(SpanView<u8> const& src, ViewYUV const& dst)
-    {
-        struct UV
-        {
-            u8 u;
-            u8 v;
-        };
-
-        static_assert(N % 2 == 0);
-
-        constexpr u32 N2 = N / 2;
-        constexpr u32 NN = N * N;
-        constexpr f32 iNN = 1.0f / (NN);
-
-        auto dw = dst.width;
-        auto dh = dst.height;
-
-        auto sy = src.begin;
-        auto suv = (UV*)(src.begin + dw * dh);
+        auto sy = src_y.matrix_data_;
+        auto suv = src_uv.matrix_data_;
 
         auto dy = dst.channel_data[(int)YUV::Y];
         auto du = dst.channel_data[(int)YUV::U];
         auto dv = dst.channel_data[(int)YUV::V];
 
-        u32 sw = dw; // src width;
+        for (u32 i = 0; i < len; i++)
+        {
+            dy[i] = (f32)sy[i];
+        }
 
-        u32 dr = 0; // dst row
-        u32 dc = 0; // dst column
-        u32 sr = 0; // src row
-        u32 sc = 0; // src column
+        for (u32 h = 0; h < height; h += 2)
+        {
+            auto du1 = du + h * width;
+            auto du2 = du1 + 1;
+            auto du3 = du1 + width;
+            auto du4 = du3 + 1;
+
+            auto dv1 = dv + h * width;
+            auto dv2 = dv1 + 1;
+            auto dv3 = dv1 + width;
+            auto dv4 = dv3 + 1;
+
+            for (u32 w = 0; w < width; w += 2)
+            {  
+                *du1 = *du2 = *du3 = *du4 = suv->u;
+                *dv1 = *dv2 = *dv3 = *dv4 = suv->v;
+                
+                suv++;
+
+                du1 += 2;
+                du2 += 2;
+                du3 += 2;
+                du4 += 2;
+
+                dv1 += 2;
+                dv2 += 2;
+                dv3 += 2;
+                dv4 += 2;
+            }
+        }
+    }
+
+
+    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<UV> const& src_uv, ViewYUV const& dst, u32 scale)
+    {
+        assert(scale == src_y.height / dst.height);
+
+        auto sw = src_y.width;
+        auto sh = src_y.height;
+
+        auto dw = dst.width;
+        auto dh = dst.height;        
+
+        u32 const N = scale;
+
+        constexpr u32 N_MAX = 8;
+
+        assert(N >= 2 || N % 2 == 0);
+        assert(N <= N_MAX);
+
+        u32 const TN = 2 * N;
+        
+        f32 const iNN = 1.0f / (N * N);
+
+        auto dy = img::select_channel(dst, (u32)YUV::Y);
+
+        auto srect_y = img::make_rect(N, N);
 
         f32 yf = 0.0f;
         f32 uf = 0.0f;
         f32 vf = 0.0f;
 
-        u32 i = 0;
-        for (; dr < dh; dr++)
+        for (u32 h = 0; h < dh; h++)
         {
-            for (; dc < dw; dc++)
+            auto drow_y = img::row_begin(dy, h);
+
+            for (u32 w = 0; w < dw; w++)
             {
-                sw = dw;
-                
                 yf = 0.0f;
-                sr = N * dr;
-                for (u32 nr = 0; nr < N; nr++)
+                auto sub_y = img::sub_view(src_y, srect_y);
+                for (u32 hs = 0; hs < sub_y.height; hs++)
                 {
-                    sc = N * dc;
-                    auto s = sy + sr * sw + sc;
-                    for (u32 nc = 0; nc < N; nc++)
-                    {                        
-                        yf += s[nc];
-                    }
-
-                    sr++;
-                }
-
-                sw = dw / 2;
-                
-                uf = vf = 0.0f;
-                sr = N2 * dr;
-                for (u32 nr = 0; nr < N2; nr++)
-                {
-                    sc = N2 * dc;
-                    auto s = suv + sr * sw + sc;
-                    for (u32 nc = 0; nc < N2; nc++)
+                    auto srow = img::row_begin(sub_y, hs);
+                    for (u32 ws = 0; ws < sub_y.width; ws++)
                     {
-                        auto uv = s[nc];
-                        uf += uv.u;
-                        vf += uv.v;
+                        yf += srow[ws];
                     }
-
-                    sr++;
                 }
 
-                dy[i] = num::round_to_unsigned<u8>(yf * iNN);
+                drow_y[w] = yf * iNN;
 
-                du[i] = num::round_to_unsigned<u8>(uf * 4 * iNN);
-                dy[i] = num::round_to_unsigned<u8>(vf * 4 * iNN);
-
-                i++;
+                srect_y.x_begin += N;
+                srect_y.x_end += N;
             }
+
+            srect_y.y_begin += N;
+            srect_y.y_end += N;
+        }
+
+        auto suv = src_uv.matrix_data_;
+
+        auto du = dst.channel_data[(u32)YUV::U];
+        auto dv = dst.channel_data[(u32)YUV::V];
+
+        auto len = dw * dh;
+
+        for (u32 i = 0; i < len; i++)
+        {
+            auto uv = suv[i];
+            du[i] = uv.u;
+            dv[i] = uv.v;
         }
     }
 }
@@ -837,9 +874,68 @@ namespace convert
 
 namespace convert
 {
-    static void yuyv_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
+    static void yuyv_to_planar_scale(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, OffsetYUYV yuyv)
     {
-        assert(src.length == dst.width * dst.height * 2);
+        img::View1<u32> v32{};
+        v32.width = width;
+        v32.height = height;
+        v32.matrix_data_ = (u32*)src.begin;
+
+        auto scale = height / dst.height;
+
+        switch (scale)
+        {
+        case 1:
+            yuyv_to_planar(v32, dst, yuyv);
+            break;
+
+        case 2:
+        case 4:
+        case 8:
+            yuyv_to_planar(v32, dst, yuyv, scale);
+            break;
+        
+        default:
+            break;
+        }
+    }
+
+
+    static void nv12_to_planar_scale(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
+    {
+        img::View1u8 src_y{};
+        src_y.width = width;
+        src_y.height = height;
+        src_y.matrix_data_ = src.begin;
+
+        img::View1<UV> src_uv{};
+        src_uv.width = width / 2;
+        src_uv.height = height / 2;
+        src_uv.matrix_data_ = (UV*)(src.begin + width * height);
+
+        auto scale = height / dst.height;
+
+        switch (scale)
+        {
+        case 1:
+            nv12_to_planar(src_y, src_uv, dst);
+            break;
+
+        case 2:
+        case 4:
+        case 8:
+            nv12_to_planar(src_y, src_uv, dst, scale);
+            break;
+
+        default:
+            break;
+        }
+    }
+    
+    
+    static void yuyv_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
+    {
+        assert(src.length == width * height * 2);
 
         OffsetYUYV yuyv{};
         yuyv.y1 = 0;
@@ -847,13 +943,13 @@ namespace convert
         yuyv.y2 = 2;
         yuyv.v  = 3;
 
-        yuyv_to_planar(src, dst, yuyv);
+        yuyv_to_planar_scale(src, width, height, dst, yuyv);
     }
 
 
-    static void yvyu_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
+    static void yvyu_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
     {
-        assert(src.length == dst.width * dst.height * 2);
+        assert(src.length == width * height * 2);
 
         OffsetYUYV yuyv{};
         yuyv.y1 = 0;
@@ -861,13 +957,13 @@ namespace convert
         yuyv.y2 = 2;
         yuyv.u  = 3;
 
-        yuyv_to_planar(src, dst, yuyv);
+        yuyv_to_planar_scale(src, width, height, dst, yuyv);
     }
 
 
-    static void uyvy_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
+    static void uyvy_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
     {
-        assert(src.length == dst.width * dst.height * 2);
+        assert(src.length == width * height * 2);
 
         OffsetYUYV yuyv{};
         yuyv.u  = 0;
@@ -875,64 +971,16 @@ namespace convert
         yuyv.v  = 2;
         yuyv.y2 = 3;
 
-        yuyv_to_planar(src, dst, yuyv);
+        yuyv_to_planar_scale(src, width, height, dst, yuyv);
     }
 
 
-    static void nv12_to_yuv(SpanView<u8> const& src, ViewYUV const& dst)
-    {
-        struct UV
-        {
-            u8 u;
-            u8 v;
-        };
+    static void nv12_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
+    { 
+        //                  |--- nv12 y ---| |------- nv12 uv ------|
+        assert(src.length == width * height + 2 * width * height / 4);
 
-        auto width = dst.width;
-        auto height = dst.height;
-        auto len = width * height;
-
-        auto sy = src.begin;
-        auto suv = (UV*)(sy + len);
-
-        auto dy = dst.channel_data[(int)YUV::Y];
-        auto du = dst.channel_data[(int)YUV::U];
-        auto dv = dst.channel_data[(int)YUV::V];
-
-        for (u32 i = 0; i < len; i++)
-        {
-            dy[i] = (f32)sy[i];
-        }
-
-        for (u32 h = 0; h < height; h += 2)
-        {
-            auto du1 = du + h * width;
-            auto du2 = du1 + 1;
-            auto du3 = du1 + width;
-            auto du4 = du3 + 1;
-
-            auto dv1 = dv + h * width;
-            auto dv2 = dv1 + 1;
-            auto dv3 = dv1 + width;
-            auto dv4 = dv3 + 1;
-
-            for (u32 w = 0; w < width; w += 2)
-            {  
-                *du1 = *du2 = *du3 = *du4 = suv->u;
-                *dv1 = *dv2 = *dv3 = *dv4 = suv->v;
-                
-                suv++;
-
-                du1 += 2;
-                du2 += 2;
-                du3 += 2;
-                du4 += 2;
-
-                dv1 += 2;
-                dv2 += 2;
-                dv3 += 2;
-                dv4 += 2;
-            }
-        }
+        nv12_to_planar_scale(src, width, height, dst);
     }
 }
 
@@ -1063,7 +1111,7 @@ namespace convert
     }
 
 
-    void to_yuv(SpanView<u8> const& src, ViewYUV const& dst, PixelFormat format)
+    void to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format)
     {
         using PF = PixelFormat;
 
@@ -1071,23 +1119,23 @@ namespace convert
         {
         case PF::YUYV:
         case PF::YUNV:
-        case PF::YUY2:
-            yuyv_to_yuv(src, dst);
+        case PF::YUY2:            
+            yuyv_to_yuv(src, width, height, dst);
             break;
         
         case PF::YVYU:
-            yvyu_to_yuv(src, dst);
+            yvyu_to_yuv(src, width, height, dst);
             break;
         
         case PF::UYVY:
         case PF::Y422:
         case PF::UYNV:
         case PF::HDYC:
-            uyvy_to_yuv(src, dst);
+            uyvy_to_yuv(src, width, height, dst);
             break;
 
         case PF::NV12:
-            nv12_to_yuv(src, dst);
+            nv12_to_yuv(src, width, height, dst);
             break;
 
         default:

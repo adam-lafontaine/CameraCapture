@@ -135,7 +135,9 @@ namespace convert
 
     ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer32& buffer);
 
-    void to_yuv(SpanView<u8> const& src, ViewYUV const& dst, PixelFormat format);
+
+    void to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format);
+
 
     void yuv_to_rgba(ViewYUV const& src, img::ImageView const& dst);
 
