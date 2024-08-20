@@ -59,7 +59,7 @@ namespace camera_usb
         uvc::device_handle* h_device = nullptr;
         uvc::stream_ctrl ctrl;
         uvc::stream_handle* h_stream = nullptr;
-        uvc::frame_desc* p_frame_desc = nullptr;
+        //uvc::frame_desc* p_frame_desc = nullptr;
 
         char product_id[5] = { 0 };
         char vendor_id[5] = { 0 };
@@ -116,7 +116,7 @@ namespace camera_usb
     }
 
 
-    static uvc::format_desc* get_frame_format(DeviceUVC const& device)
+    static uvc::opt::FrameFormat get_frame_format(DeviceUVC const& device)
     {
         using PF = cvt::PixelFormat;
 
@@ -136,14 +136,16 @@ namespace camera_usb
 
         for (u32 i = 0; i < N; i++)
         {
-            auto format = uvc::opt::find_format_desc(device.h_device, (u32)formats[i]);
-            if (format)
+            auto format = uvc::opt::find_frame_format(device.h_device, (u32)formats[i], 30);
+            if (format.ok)
             {
                 return format;
             }
         }
 
-        return 0;        
+        uvc::opt::FrameFormat ff;
+
+        return ff;        
     }
     
     
@@ -159,6 +161,7 @@ namespace camera_usb
         auto res = uvc::opt::uvc_get_stream_ctrl_format_size(
             device.h_device, 
             &device.ctrl, // result stored in ctrl
+            (u32)device.config.pixel_format,
             device.config.frame_width, 
             device.config.frame_height, 
             device.config.fps);
@@ -243,26 +246,21 @@ namespace camera_usb
 
         auto& config = device.config;
 
-        const uvc::format_desc* format_desc = get_frame_format(device);
-        uvc::frame_desc* frame_desc = format_desc->frame_descs;
+        auto format = get_frame_format(device);
 
-        if (!frame_desc) 
-        { 
+        if (!format.ok)
+        {
             return false;
         }
 
-        device.p_frame_desc = frame_desc;
-
-        //format_desc->bBitsPerPixel;
-
         // this may break if camera does not support dimensions
-        config.frame_width = num::min(WIDTH_MAX, (u32)frame_desc->wWidth);
-        config.frame_height = num::min(HEIGHT_MAX, (u32)frame_desc->wHeight);
-        config.fps = 10'000'000 / frame_desc->dwDefaultFrameInterval;
+        config.frame_width = format.width;
+        config.frame_height = format.height;
+        config.fps = 10'000'000 / format.interval;
 
-        qsnprintf(config.format_code, 5, "%s", (char*)format_desc->fourccFormat);
+        cvt::u32_to_fcc(format.four_cc_bytes, config.format_code);
 
-        config.pixel_format = cvt::fcc_to_pf(config.format_code);
+        config.pixel_format = cvt::fcc_to_pf(config.format_code);        
 
         return load_device_config(device);
     }

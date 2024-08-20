@@ -881,12 +881,27 @@ namespace uvc
 {
 namespace opt
 {
+    class FrameFormat
+    {
+    public:
+        u32 four_cc_bytes = 0;
+        u32 width = 0;
+        u32 height = 0;
+        u32 interval = 0;
+
+        b8 ok = 0;
+    };
+
+    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps);
+
+
 
     uvc_format_desc* find_format_desc(uvc_device_handle *devh, u32 four_cc_bytes);
 
     uvc_error_t uvc_get_stream_ctrl_format_size(
         uvc_device_handle_t *devh,
         uvc_stream_ctrl_t *ctrl,
+        u32 four_cc_bytes,
         int width, int height,
         int fps);
 
@@ -9418,13 +9433,7 @@ namespace uvc
 {
 namespace opt
 { 
-    enum class jpeg_out_format : int
-    {
-        UNKNOWN,
-        RGB8,
-        RGBA8,
-        GRAY8
-    };
+    
 
 
     uvc_format_desc* find_format_desc(uvc_device_handle *devh, u32 four_cc_bytes)
@@ -9446,9 +9455,60 @@ namespace opt
     }
 
 
+    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps)
+    {
+        FrameFormat ff;
+        ff.interval = 0;
+        u32 max_interval = 10000000 / min_fps;
+
+        uvc_streaming_interface* stream_if;
+        DL_FOREACH(devh->info->stream_ifs, stream_if)
+        {
+            uvc_format_desc* format;
+            DL_FOREACH(stream_if->format_descs, format)
+            {
+                if (*(u32*)(format->fourccFormat) != four_cc_bytes)
+                {
+                    continue;
+                }
+
+                ff.four_cc_bytes = four_cc_bytes;
+
+                uvc_frame_desc_t *frame;
+                DL_FOREACH(format->frame_descs, frame)
+                {
+                    if (!frame->intervals)
+                    {
+                        continue;
+                    }
+
+                    for (u32* interval = frame->intervals; *interval; ++interval)
+                    {
+                        if (*interval > max_interval)
+                        {
+                            continue;
+                        }
+
+                        if (!ff.interval || *interval < ff.interval)
+                        {
+                            ff.interval = *interval;
+                            ff.width = frame->wWidth;
+                            ff.height = frame->wHeight;
+                            ff.ok = 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        return ff;
+    }
+
+
     uvc_error_t uvc_get_stream_ctrl_format_size(
         uvc_device_handle_t *devh,
         uvc_stream_ctrl_t *ctrl,
+        u32 four_cc_bytes,
         int width, int height,
         int fps)
     {
@@ -9461,13 +9521,12 @@ namespace opt
 
             DL_FOREACH(stream_if->format_descs, format)
             {
-                uvc_frame_desc_t *frame;
-                /*
-                Not relying on libuvc for image conversion
-                if (!_uvc_frame_format_matches_guid(cf, format->guidFormat))
+                if (*(u32*)(format->fourccFormat) != four_cc_bytes)
+                {
                     continue;
-                */
+                }
 
+                uvc_frame_desc_t *frame;
                 DL_FOREACH(format->frame_descs, frame)
                 {
                     if (frame->wWidth != width || frame->wHeight != height)
@@ -9526,6 +9585,14 @@ namespace opt
     
 
 #ifdef LIBUVC_HAS_JPEG
+
+    enum class jpeg_out_format : int
+    {
+        UNKNOWN,
+        RGB8,
+        RGBA8,
+        GRAY8
+    };
 
     class jpeg_info_t
     {

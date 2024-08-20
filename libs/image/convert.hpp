@@ -102,7 +102,7 @@ namespace convert
     };
 
 
-    static inline void pf_to_fcc(PixelFormat pf, char* dst)
+    static inline void u32_to_fcc(u32 bytes4, char* dst)
     {
         union
         {
@@ -110,12 +110,18 @@ namespace convert
             char fcc[4];
         } sd;
 
-        sd.value = (u32)pf;
+        sd.value = bytes4;
 
         for (u32 i = 0; i < 4; i++)
         {
             dst[i] = sd.fcc[i];
         }
+    }
+
+
+    static inline void pf_to_fcc(PixelFormat pf, char* dst)
+    {
+        u32_to_fcc((u32)pf, dst);
     }
 
 
