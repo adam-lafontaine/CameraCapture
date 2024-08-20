@@ -2,7 +2,6 @@
 
 #include "camera_usb.hpp"
 #include "../image/convert.hpp"
-#include "../qsprintf/qsprintf.hpp"
 #include "../util/numeric.hpp"
 #include "../util/stopwatch.hpp"
 
@@ -497,6 +496,8 @@ namespace camera_usb
 }
 
 
+/* static devices */
+
 namespace camera_usb
 {
     static DeviceListW32 w32_list;
@@ -523,6 +524,7 @@ namespace camera_usb
 
         if (!enumerate_devices(w32_list))
         {
+            mb::destroy_buffer(w32_list.data32);
             cameras.count = 0;
             cameras.status = ConnectionStatus::Disconnected;
             return cameras;
@@ -554,6 +556,7 @@ namespace camera_usb
 
     void close(CameraList& cameras)
     {
+        mb::destroy_buffer(w32_list.data32);
         close_devices(w32_list);
 
         for (u32 i = 0; i < cameras.count; i++)

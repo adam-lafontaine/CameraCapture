@@ -117,6 +117,12 @@ namespace convert
             dst[i] = sd.fcc[i];
         }
     }
+
+
+    static inline PixelFormat fcc_to_pf(cstr fcc)
+    {
+        return (PixelFormat)fcc_to_u32(fcc);
+    }
 }
 
 

@@ -4,6 +4,7 @@
 
 #include <jpeglib.h>
 
+#if 0
 
 namespace mjpeg
 {
@@ -204,6 +205,7 @@ namespace mjpeg
     }
 }
 
+#endif
 
 /* yuyv_to_planar */
 
@@ -662,13 +664,14 @@ namespace convert
 
 namespace convert
 {
+    /*
     void mjpeg_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
     {
         auto format = mjpeg::image_format::RGBA8;
 
         mjpeg::convert(src.begin, dst.width, src.length, (u8*)dst.matrix_data_, format);
     }
-
+*/
 
     void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
     {
@@ -1052,7 +1055,7 @@ namespace convert
             break;
         
         case PF::MJPG:
-            mjpeg_to_rgba(src, dst);
+            //mjpeg_to_rgba(src, dst);
             break;
 
         default:

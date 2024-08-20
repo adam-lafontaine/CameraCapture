@@ -171,12 +171,16 @@ sdl_input_c += $(numeric_h)
 camera_usb_h := $(usb)/camera_usb.hpp
 libuvc_h     := $(usb)/libuvc3.hpp
 mem_uvc_h    := $(usb)/mem_uvc.hpp
+convert_h := $(image)/convert.hpp
+convert_c := $(image)/convert.cpp
 
 camera_usb_c := $(usb)/camera_uvc.cpp
 camera_usb_c += $(camera_usb_h)
 camera_usb_c += $(libuvc_h)
 camera_usb_c += $(mem_uvc_h)
 camera_usb_c += $(usb)/mem_uvc.cpp
+camera_usb_c += $(convert_h)
+camera_usb_c += $(convert_c)
 
 #**********
 
