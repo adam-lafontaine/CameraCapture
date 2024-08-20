@@ -1,5 +1,7 @@
-GPP := g++-11 -std=c++20 -mavx
+GPP := g++-11
 
+GPP += -std=c++20
+GPP += -mavx
 #GPP += -O3
 #GPP += -DNDEBUG
 
@@ -47,7 +49,7 @@ sdl        := $(libs)/sdl
 
 #*** imgui ***
 
-imgui := $(src)/imgui_sdl_ogl
+imgui := $(pltfm)
 imgui_options_h := $(imgui)/imgui_options.hpp
 
 imgui_include_h := $(imgui)/imgui_include.hpp

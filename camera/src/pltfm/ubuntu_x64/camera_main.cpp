@@ -1,4 +1,4 @@
-#include "../../imgui_sdl_ogl/imgui_include.hpp"
+#include "imgui_include.hpp"
 #include "../../input_display/input_display.hpp"
 #include "../../camera_display/camera_display.hpp"
 #include "../../diagnostics/diagnostics.hpp"
