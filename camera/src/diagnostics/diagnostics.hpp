@@ -3,7 +3,5 @@
 
 namespace diagnostics
 {
-    void show_memory();
-
-    void show_uvc_memory();
+    void show_diagnostics();
 }

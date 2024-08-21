@@ -8,9 +8,7 @@
 
 namespace diagnostics
 {
-    void show_memory(){}
-
-    void show_uvc_memory(){}
+    void show_diagnostics(){}
 }
 
 #else
@@ -304,25 +302,12 @@ namespace diagnostics
     }
 }
 
-
+#ifdef __linux__
 #include "../../../libs/usb/mem_uvc.hpp"
-
 
 namespace diagnostics
 {
-    void show_memory()
-    {
-        if (!ImGui::CollapsingHeader("Memory"))
-        {
-            return; 
-        }
-        
-        current_alloc_table();
-        alloc_history_table();
-    }
-
-
-    void show_uvc_memory()
+    static void show_uvc_memory()
     {
         if (!ImGui::CollapsingHeader("UVC"))
         {
@@ -339,6 +324,40 @@ namespace diagnostics
         ImGui::Text(" malloc: %u", stats.malloc);
         ImGui::Text("realloc: %u", stats.realloc);
         ImGui::Text("   free: %u", stats.free);
+    }
+}
+
+#else
+
+namespace diagnostics
+{
+    static void show_uvc_memory(){}
+}
+#endif
+
+
+namespace diagnostics
+{
+    static void show_memory()
+    {
+        if (!ImGui::CollapsingHeader("Memory"))
+        {
+            return; 
+        }
+        
+        current_alloc_table();
+        alloc_history_table();
+    }
+
+
+    void show_diagnostics()
+    {
+        ImGui::Begin("Diagnostics");
+
+        show_memory();
+        show_uvc_memory();
+
+        ImGui::End();
     }
 }
 

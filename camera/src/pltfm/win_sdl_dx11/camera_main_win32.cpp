@@ -1,13 +1,18 @@
 #include "imgui_include.hpp"
+
+#ifndef NDEBUG
 #include "../../input_display/input_display.hpp"
-#include "../../camera_display/camera_display.hpp"
 #include "../../diagnostics/diagnostics.hpp"
+
+namespace idsp = input_display;
+#endif
+
+#include "../../camera_display/camera_display.hpp"
 #include "../../../../libs/sdl/sdl_include.hpp"
 #include "../../../../libs/util/stopwatch.hpp"
 
 
 namespace img = image;
-namespace idsp = input_display;
 namespace cdsp = camera_display;
 
 
@@ -44,26 +49,13 @@ static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, inpu
 }
 
 
-static void ui_input_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
+static void texture_window(cstr title, dx11::Texture const& texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
-    ImGui::Begin("Input");
+    ImGui::Begin(title);
 
-    dx11::display_texture(texture, ImVec2(w, h));
-
-    ImGui::End();
-}
-
-
-static void ui_camera_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
-{
-    auto w = width * scale;
-    auto h = height * scale;
-
-    ImGui::Begin("Camera");
-    
     dx11::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
@@ -75,17 +67,6 @@ static void ui_camera_controls_window(cdsp::CameraState& state)
     ImGui::Begin("Controls");
 
     camera_display::show_cameras(state);
-
-    ImGui::End();
-}
-
-
-static void ui_diagnostics_window()
-{
-    ImGui::Begin("Diagnostics");
-
-    diagnostics::show_memory();
-    diagnostics::show_uvc_memory();
 
     ImGui::End();
 }
@@ -125,6 +106,25 @@ namespace
 
     Stopwatch main_sw;
     f64 main_frame_ns;
+}
+
+
+static bool init_input_display()
+{
+#ifndef NDEBUG
+
+    if (!idsp::init(io_state))
+    {
+        sdl::print_message("Error: idsp::init()");
+        sdl::close();
+        return false;
+    }    
+
+    auto& io_display = io_state.display;
+    dx11::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
+#endif
+
+    return true;
 }
 
 
@@ -286,11 +286,13 @@ static void render_imgui_frame()
     ui::show_imgui_demo(ui_state);
 #endif
 
-    ui_input_window(textures.get(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
-    ui_camera_window(textures.get(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
+#ifndef NDEBUG
+    texture_window("Input", textures.get(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
+    diagnostics::show_diagnostics();
+#endif
+    
+    texture_window("Camera", textures.get(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
     ui_camera_controls_window(camera_state);
-
-    ui_diagnostics_window();
 
     ImGui::Render();
 
@@ -369,6 +371,8 @@ static bool main_init()
     ui::set_imgui_style();
     ui_state.io = &io;
 
+    textures = dx11::create_textures<N_TEXTURES>();
+
     // TODO init camera app
     u32 w = 640;
     u32 h = 480;
@@ -378,17 +382,10 @@ static bool main_init()
 
     cdsp::init_async(camera_state);
 
-    if (!idsp::init(io_state))
+    if (!init_input_display())
     {
-        sdl::print_message("Error: idsp::init()");
-        sdl::close();
         return false;
     }
-
-    textures = dx11::create_textures<N_TEXTURES>();
-
-    auto& io_display = io_state.display;
-    dx11::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
     
     auto& camera_display = camera_state.display;
     dx11::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
