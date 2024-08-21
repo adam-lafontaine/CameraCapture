@@ -387,8 +387,8 @@ static bool main_init()
 
 static void main_close()
 { 
-    idsp::close(io_state);
-    cdsp::close(camera_state);
+    cdsp::close_async(camera_state);
+    idsp::close(io_state);    
     
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();

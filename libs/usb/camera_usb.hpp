@@ -9,8 +9,8 @@ namespace img = image;
 
 namespace camera_usb
 {
-    constexpr u32 WIDTH_MAX = 1280;
-    constexpr u32 HEIGHT_MAX = 720;
+    constexpr u32 WIDTH_MAX = 640;
+    constexpr u32 HEIGHT_MAX = 480;
 }
 
 

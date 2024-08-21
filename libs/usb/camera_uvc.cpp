@@ -11,22 +11,6 @@
 
 namespace num = numeric;
 
-/*
-
-libuvc requires RW permissions for opening capturing devices, so you must
-create the following .rules file:
-
-/etc/udev/rules.d/99-uvc.rules
-
-Then, for each webcam add the following line:
-
-SUBSYSTEMS=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="YYYY", MODE="0666"
-
-Replace XXXX and YYYY for the 4 hexadecimal characters corresponding to the
-vendor and product ID of your webcams.
-
-*/
-
 
 namespace camera_usb
 {
@@ -89,6 +73,51 @@ namespace camera_usb
 
         img::Buffer32 data32;
     };
+}
+
+
+namespace camera_usb
+{
+/*
+
+libuvc requires RW permissions for opening capturing devices, so you must
+create the following .rules file:
+
+/etc/udev/rules.d/99-uvc.rules
+
+Then, for each webcam add the following line:
+
+SUBSYSTEMS=="usb", ENV{DEVTYPE}=="usb_device", ATTRS{idVendor}=="XXXX", ATTRS{idProduct}=="YYYY", MODE="0666"
+
+Replace XXXX and YYYY for the 4 hexadecimal characters corresponding to the
+vendor and product ID of your webcams.
+
+*/
+
+    static void print_device_permissions_msg(DeviceListUVC const& list)
+    {
+#ifndef NDEBUG
+
+    printf("\n********** LINUX PERMISSIONS MESSAGE **********\n\n");
+
+    printf("Libuvc requires RW permissions for opening capturing devices, so you must create the following .rules file:\n\n");
+    printf("/etc/udev/rules.d/99-uvc.rules\n\n");
+    printf("Add the following line(s) to register each device:\n\n");
+
+    auto const fmt = "SUBSYSTEMS==\"usb\", ENV{DEVTYPE}==\"usb_device\", ATTRS{idVendor}==\"%s\", ATTRS{idProduct}==\"%s\", MODE=\"0666\"\n";
+
+    for (u32 i = 0; i < list.count; i++)
+    {
+        auto& cam = list.devices[i];
+        printf(fmt, cam.vendor_id, cam.product_id);
+    }
+
+    printf("Restart the computer for the changes to take effect.");
+
+    printf("\n\n********** LINUX PERMISSIONS MESSAGE **********\n\n");
+
+#endif
+    }
 }
 
 
@@ -209,7 +238,9 @@ namespace camera_usb
 
     static void enable_exposure_mode(DeviceUVC const& device)
     {
+        constexpr u8 EXPOSURE_MODE_MANUAL = 1;
         constexpr u8 EXPOSURE_MODE_AUTO = 2;
+        constexpr u8 EXPOSURE_MODE_SHUTTER_PRIORITY = 4;
         constexpr u8 EXPOSURE_MODE_APERTURE = 8;
 
         auto res = uvc::uvc_set_ae_mode(device.h_device, EXPOSURE_MODE_AUTO);
@@ -329,6 +360,11 @@ namespace camera_usb
             read_device_properties(device);
 
             ++list.count;
+        }
+
+        if (list.count)
+        {
+            print_device_permissions_msg(list);
         }
 
         return list.count > 0;
