@@ -370,8 +370,8 @@ static bool main_init()
     ui_state.io = &io;
 
     // TODO init camera app
-    u32 w = 1280;
-    u32 h = 720;
+    u32 w = 640;
+    u32 h = 480;
     camera_buffer = img::create_buffer32(w * h, "camera display");
     camera_state.display = img::make_view(w, h, camera_buffer);
     img::fill(camera_state.display, img::to_pixel(128));
@@ -400,7 +400,7 @@ static bool main_init()
 static void main_close()
 {
     idsp::close(io_state);
-    cdsp::close(camera_state);
+    cdsp::close_async(camera_state);
 
     // Cleanup
     ImGui_ImplDX11_Shutdown();
