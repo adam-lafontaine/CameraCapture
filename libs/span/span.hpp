@@ -75,6 +75,30 @@ namespace span
 
         return view;
     }
+
+
+    template <typename T>
+    inline SpanView<T> make_view(T* data, u32 length)
+    {
+        SpanView<T> view{};
+
+        view.begin = data;
+        view.length = length;
+
+        return view;
+    }
+
+
+    template <typename T>
+    inline SpanView<T> sub_view(SpanView<T> view, u32 offset, u32 len)
+    {
+        SpanView<T> sub{};
+
+        sub.begin = view.begin + offset;
+        sub.length = len;
+
+        return sub;
+    }
 }
 
 

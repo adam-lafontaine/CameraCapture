@@ -6,19 +6,9 @@
 #include "../../../../libs/util/stopwatch.hpp"
 
 
-#include <thread>
-
-
 namespace img = image;
 namespace idsp = input_display;
 namespace cdsp = camera_display;
-
-
-constexpr f64 NANO = 1'000'000'000;
-constexpr f64 MICRO = 1'000'000;
-
-constexpr f64 TARGET_FRAMERATE_HZ = 60.0;
-constexpr f64 TARGET_NS_PER_FRAME = NANO / TARGET_FRAMERATE_HZ;
 
 
 
@@ -54,27 +44,27 @@ static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, inpu
 }
 
 
-static void ui_input_window(ogl::Texture texture, u32 width, u32 height, f32 scale)
+static void ui_input_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
     ImGui::Begin("Input");
 
-    ogl::display_texture(texture, ImVec2(w, h));
+    dx11::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
 }
 
 
-static void ui_camera_window(ogl::Texture texture, u32 width, u32 height, f32 scale)
+static void ui_camera_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
     ImGui::Begin("Camera");
-
-    ogl::display_texture(texture, ImVec2(w, h));
+    
+    dx11::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
 }
@@ -122,22 +112,29 @@ namespace
     cdsp::CameraState camera_state{};
 
     img::Buffer32 camera_buffer;
-    
 
     constexpr u32 N_TEXTURES = 2;
-    constexpr ogl::TextureId input_texture_id = { 0 };
-    constexpr ogl::TextureId camera_texture_id = { 1 };
-    ogl::TextureList<N_TEXTURES> textures;
+    constexpr dx11::TextureId input_texture_id = { 0 };
+    constexpr dx11::TextureId camera_texture_id = { 1 };
+    dx11::TextureList<N_TEXTURES> textures;
 
     ui::UIState ui_state{};
     SDL_Window* window = 0;
-    SDL_GLContext gl_context;
     
     RunState run_state = RunState::Begin;
 
     Stopwatch main_sw;
     f64 main_frame_ns;
 }
+
+
+
+
+// Forward declarations of helper functions
+bool CreateDeviceD3D(HWND hWnd);
+void CleanupDeviceD3D();
+void CreateRenderTarget();
+void CleanupRenderTarget();
 
 
 static void end_program()
@@ -172,23 +169,32 @@ static void swap_inputs()
 }
 
 
-static void wait_for_framerate()
-{
-    constexpr f64 fudge = 0.9;
-
-    main_frame_ns = main_sw.get_time_nano();
-    auto sleep_ns = TARGET_NS_PER_FRAME - main_frame_ns;
-    if (sleep_ns > 0.0)
-    {
-        std::this_thread::sleep_for(std::chrono::nanoseconds((i64)(sleep_ns * fudge)));
-    }
-
-    main_sw.start();
-}
-
-
 static void handle_window_event(SDL_Event const& event, SDL_Window* window)
 {
+    auto const window_resize = [&]()
+    {
+        if (event.window.windowID == SDL_GetWindowID(window))
+        {
+            return;
+        }
+
+        // TODO
+        int w, h;
+        SDL_GetWindowSize(window, &w, &h);
+        // Release all outstanding references to the swap chain's buffers before resizing.
+        CleanupRenderTarget();
+        g_pSwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+        CreateRenderTarget();
+    };
+
+    auto const window_close = [&]()
+    {
+        if (event.window.windowID == SDL_GetWindowID(window))
+        {
+            end_program();
+        }
+    };
+
     switch (event.type)
     {
     case SDL_QUIT:
@@ -200,14 +206,12 @@ static void handle_window_event(SDL_Event const& event, SDL_Window* window)
         switch (event.window.event)
         {
         case SDL_WINDOWEVENT_SIZE_CHANGED:
-        //case SDL_WINDOWEVENT_RESIZED:
-            int w, h;
-            SDL_GetWindowSize(window, &w, &h);
-            glViewport(0, 0, w, h);
+        case SDL_WINDOWEVENT_RESIZED:
+            window_resize();
             break;
 
         case SDL_WINDOWEVENT_CLOSE:
-            end_program();
+            window_close();
             break;
         
         default:
@@ -270,7 +274,8 @@ static void process_user_input()
 
 static void render_imgui_frame()
 {
-    ImGui_ImplOpenGL3_NewFrame();
+    // Start the Dear ImGui frame
+    ImGui_ImplDX11_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
@@ -288,20 +293,16 @@ static void render_imgui_frame()
     ui_diagnostics_window();
 
     ImGui::Render();
-    
-    glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-    if ((*ui_state.io).ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        SDL_Window* backup_current_window = SDL_GL_GetCurrentWindow();
-        SDL_GL_MakeCurrent(window, gl_context);
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        SDL_GL_MakeCurrent(backup_current_window, gl_context);
-    }
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    SDL_GL_SwapWindow(window);    
+    const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
+    g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+    g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color_with_alpha);
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+    g_pSwapChain->Present(1, 0); // Present with vsync
+    //g_pSwapChain->Present(0, 0); // Present without vsync
 }
 
 
@@ -322,7 +323,14 @@ static bool main_init()
     SDL_DisplayMode dm;
     SDL_GetCurrentDisplayMode(0, &dm);
 
-    window = ui::create_sdl_ogl_window("Camera", dm.w, dm.h);    
+    auto df = 0.9f;
+    auto dw = (int)(df * dm.w);
+    auto dh = (int)(df * dm.h);
+
+    //auto dw = dm.w;
+    //auto dh = dm.h;
+
+    window = ui::create_sdl_dx11_window("Camera", dw, dh);
     if (!window)
     {
         sdl::print_error("Error: create_sdl_ogl_window()");
@@ -330,11 +338,19 @@ static bool main_init()
         return false;
     }
 
-    set_game_window_icon(window);    
+    set_game_window_icon(window);
 
-    gl_context = SDL_GL_CreateContext(window);
-    SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1); // Enable vsync
+    SDL_SysWMinfo wmInfo;
+    SDL_VERSION(&wmInfo.version);
+    SDL_GetWindowWMInfo(window, &wmInfo);
+    HWND hwnd = (HWND)wmInfo.info.win.window;
+
+    // Initialize Direct3D
+    if (!CreateDeviceD3D(hwnd))
+    {
+        CleanupDeviceD3D();
+        return 1;
+    }
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -344,17 +360,13 @@ static bool main_init()
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;    
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Setup Platform/Renderer backends
-    auto glsl_version = ogl::get_glsl_version();
-    ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplSDL2_InitForD3D(window);
+    ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
     ui::set_imgui_style();
-
-    glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-    
     ui_state.io = &io;
 
     // TODO init camera app
@@ -365,7 +377,7 @@ static bool main_init()
     img::fill(camera_state.display, img::to_pixel(128));
 
     cdsp::init_async(camera_state);
-    
+
     if (!idsp::init(io_state))
     {
         sdl::print_message("Error: idsp::init()");
@@ -373,27 +385,29 @@ static bool main_init()
         return false;
     }
 
-    textures = ogl::create_textures<N_TEXTURES>();
+    textures = dx11::create_textures<N_TEXTURES>();
 
     auto& io_display = io_state.display;
-    ogl::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
+    dx11::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
     
     auto& camera_display = camera_state.display;
-    ogl::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
+    dx11::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
 
     return true;
 }
 
 
 static void main_close()
-{ 
+{
+    idsp::close(io_state);
     cdsp::close_async(camera_state);
-    idsp::close(io_state);    
-    
-    ImGui_ImplOpenGL3_Shutdown();
+
+    // Cleanup
+    ImGui_ImplDX11_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
-    SDL_GL_DeleteContext(gl_context);
+
+    CleanupDeviceD3D();
 
     SDL_DestroyWindow(window);
 
@@ -416,14 +430,11 @@ static void main_loop()
         auto& input = user_input[input_id_curr];
         
         idsp::update(input, io_state);
+        
+        dx11::render_texture(textures.get(input_texture_id));
+        dx11::render_texture(textures.get(camera_texture_id));
 
-        ogl::render_texture(textures.get(input_texture_id));
-        ogl::render_texture(textures.get(camera_texture_id));
-
-        render_imgui_frame();        
-
-        // cap frame rate
-        wait_for_framerate();
+        render_imgui_frame(); 
     }
 }
 
@@ -447,6 +458,60 @@ int main()
     return EXIT_SUCCESS;
 }
 
+
+// Helper functions to use DirectX11
+bool CreateDeviceD3D(HWND hWnd)
+{
+    // Setup swap chain
+    DXGI_SWAP_CHAIN_DESC sd;
+    ZeroMemory(&sd, sizeof(sd));
+    sd.BufferCount = 2;
+    sd.BufferDesc.Width = 0;
+    sd.BufferDesc.Height = 0;
+    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    sd.BufferDesc.RefreshRate.Numerator = 60;
+    sd.BufferDesc.RefreshRate.Denominator = 1;
+    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    sd.OutputWindow = hWnd;
+    sd.SampleDesc.Count = 1;
+    sd.SampleDesc.Quality = 0;
+    sd.Windowed = TRUE;
+    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+    UINT createDeviceFlags = 0;
+    //createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    D3D_FEATURE_LEVEL featureLevel;
+    const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
+    if (D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext) != S_OK)
+        return false;
+
+    CreateRenderTarget();
+    return true;
+}
+
+void CleanupDeviceD3D()
+{
+    CleanupRenderTarget();
+    if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
+    if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
+    if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
+}
+
+void CreateRenderTarget()
+{
+    ID3D11Texture2D* pBackBuffer;
+    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
+    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
+    pBackBuffer->Release();
+}
+
+void CleanupRenderTarget()
+{
+    if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
+}
+
+
 #include "../../../../libs/alloc_type/alloc_type.cpp"
 #include "../../../../libs/image/image.cpp"
 #include "../../../../libs/qsprintf/qsprintf.cpp"
@@ -454,7 +519,7 @@ int main()
 #include "../../../../libs/span/span.cpp"
 #include "../../../../libs/stb_image/stb_image_options.hpp"
 
-#include "../../../../libs/usb/camera_uvc.cpp"
+#include "../../../../libs/usb/camera_win.cpp"
 
 #include "../../camera_display/camera_display.cpp"
 #include "../../input_display/input_display.cpp"

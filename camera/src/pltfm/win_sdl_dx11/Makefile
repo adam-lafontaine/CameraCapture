@@ -1,32 +1,54 @@
-GPP := g++-11
+GPP := g++
 
 GPP += -std=c++20
 GPP += -mavx
 #GPP += -O3
 #GPP += -DNDEBUG
+GPP += -mwindows
 
 #GPP += -DIMAGE_READ
 #GPP += -DIMAGE_WRITE
-GPP += -DALLOC_COUNT
+#GPP += -DALLOC_COUNT
 
-NO_FLAGS := 
-SDL2   := `sdl2-config --cflags --libs`
-OPENGL := -lGL -ldl
-USB    := -pthread `pkg-config --libs --cflags libusb-1.0` -ljpeg
 
-ALL_LFLAGS := $(SDL2) $(OPENGL) $(USB)
+# directories
+SDL := C:\SDL2\SDL2-2.30.5\x86_64-w64-mingw32
+VCPKG := C:\D_Data\vcpkg\installed\x64-windows
+
+# include directory flags
+ISDL := -I$(SDL)\include -I$(SDL)\include\SDL2
+IVCPKG := -I$(VCPKG)/include
+
+# link directory flags
+LDSDL := -L$(SDL)\lib
+LDVCPKG := -L$(VCPKG)/lib
+
+# dll files
+SDL_DLL := $(SDL)/bin/SDL2.dll
+JPEG_DLL := $(VCPKG)/bin/jpeg62.dll
+
+
+# flags
+IFLAGS := $(ISDL) $(IVCPKG)
+
+LDX11 := -limm32 -ld3d11 -ld3dcompiler -ldxgi
+LSDL  := $(LDSDL) -lmingw32 -lsdl2 -lSDL2main -lopengl32 -lgdi32
+LUSB := $(LDVCPKG) -lmf -lmfplat -lmfreadwrite -lmfuuid -lShlwapi -lOle32 -ljpeg
+
+ALL_LFLAGS :=  $(LSDL) $(LDX11) $(LUSB)
+
 
 root       := ../../../..
 
 camera := $(root)/camera
-build  := $(camera)/build/ubuntu
+build  := $(camera)/build/win
 src    := $(camera)/src
 
-pltfm := $(src)/pltfm/ubuntu_x64
+pltfm := $(src)/pltfm/win_sdl_dx11
 
 libs := $(root)/libs
 
-exe := camera
+exe := camera.exe
 
 program_exe := $(build)/$(exe)
 
@@ -169,16 +191,11 @@ sdl_input_c += $(numeric_h)
 #*** usb ***
 
 camera_usb_h := $(usb)/camera_usb.hpp
-libuvc_h     := $(usb)/libuvc3.hpp
-mem_uvc_h    := $(usb)/mem_uvc.hpp
 convert_h := $(image)/convert.hpp
 convert_c := $(image)/convert.cpp
 
-camera_usb_c := $(usb)/camera_uvc.cpp
+camera_usb_c := $(usb)/camera_win.cpp
 camera_usb_c += $(camera_usb_h)
-camera_usb_c += $(libuvc_h)
-camera_usb_c += $(mem_uvc_h)
-camera_usb_c += $(usb)/mem_uvc.cpp
 camera_usb_c += $(convert_h)
 camera_usb_c += $(convert_c)
 
@@ -229,9 +246,10 @@ camera_display_c := $(camera_display)/camera_display.cpp
 
 #*** main cpp ***
 
-main_c := $(pltfm)/camera_main.cpp
+main_c := $(pltfm)/camera_main_win32.cpp
 main_o := $(build)/main.o
 obj    := $(main_o)
+
 
 main_dep := $(imgui_include_h)
 main_dep += $(sdl_include_h)
@@ -267,22 +285,23 @@ imgui_dep := $(imgui_options_h)
 
 #*** app ***
 
-
 $(main_o): $(main_c) $(main_dep)
-	@echo "\n  main"
-	$(GPP) -o $@ -c $< $(ALL_LFLAGS)
+	@echo "  main"
+	$(GPP) $(IFLAGS) -o $@ -c $< $(ALL_LFLAGS)
 
 
 $(imgui_o): $(imgui_c) $(imgui_dep)
-	@echo "\n  imgui"
-	$(GPP) -o $@ -c $< $(SDL2) $(OPENGL)
+	@echo "  imgui"
+	$(GPP) $(IFLAGS) -o $@ -c $< $(LSDL) $(LDX11)
 
 #**************
 
 
 $(program_exe): $(obj)
-	@echo "\n  program_exe"
+	@echo "  program_exe"
 	$(GPP) -o $@ $+ $(ALL_LFLAGS)
+	cp $(SDL_DLL) $(build)
+	cp $(JPEG_DLL) $(build)
 
 
 build: $(program_exe)

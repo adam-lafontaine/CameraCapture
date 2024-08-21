@@ -326,9 +326,11 @@ namespace camera_display
     }
 
 
-    void close(CameraState& state)
+    void close_async(CameraState& state)
     {
-        camera_usb::close(state.cameras);
+        std::thread th([&](){ camera_usb::close(state.cameras); });
+
+        th.detach();
     }
 
 

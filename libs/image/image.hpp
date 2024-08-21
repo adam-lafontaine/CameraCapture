@@ -263,6 +263,71 @@ namespace image
 }
 
 
+/* row_span */
+
+namespace image
+{
+    template <typename T>
+	static inline SpanView<T> row_span(MatrixView2D<T> const& view, u32 y)
+	{
+        SpanView<T> span{};
+
+        span.begin = view.matrix_data_ + (u64)y * view.width;
+        span.length = view.width;
+
+        return span;
+	}
+
+
+    template <typename T>
+    static inline SpanView<T> row_span(MatrixSubView2D<T> const& view, u32 y)
+    {
+        SpanView<T> span{};
+
+        span.begin = view.matrix_data_ + (u64)(view.y_begin + y) * view.matrix_width + view.x_begin;
+        span.length = view.width;
+
+        return span;
+    }
+
+
+    template <typename T>
+    static inline SpanView<T> to_span(MatrixView2D<T> const& view)
+    {
+        SpanView<T> span{};
+
+        span.begin = view.matrix_data_;
+        span.length = view.width * view.height;
+
+        return span;
+    }
+
+
+    template <typename T>
+    static inline SpanView<T> sub_span(MatrixView2D<T> const& view, u32 y, u32 x_begin, u32 x_end)
+    {
+        SpanView<T> span{};
+
+        span.begin = view.matrix_data_ + (u64)(y * view.width) + x_begin;
+        span.length = x_end - x_begin;
+
+        return span;
+    }
+
+
+    template <typename T>
+    static inline SpanView<T> sub_span(MatrixSubView2D<T> const& view, u32 y, u32 x_begin, u32 x_end)
+    {
+        SpanView<T> span{};
+
+        span.begin = view.matrix_data_ + (u64)((view.y_begin + y) * view.matrix_width + view.x_begin) + x_begin;
+        span.length = x_end - x_begin;
+
+        return span;
+    }
+}
+
+
 /* planar channels */
 
 namespace image
@@ -300,16 +365,9 @@ namespace image
     using ViewRGBu8 = View3u8;
 
 
-    enum class RGB : int
-	{
-		R = 0, G = 1, B = 2
-	};
+    enum class RGB : int { R = 0, G = 1, B = 2 };
 
-
-	enum class RGBA : int
-	{
-		R = 0, G = 1, B = 2, A = 3
-	};
+	enum class RGBA : int {	R = 0, G = 1, B = 2, A = 3 };
 
 
     template <typename T, u32 C>
@@ -348,6 +406,26 @@ namespace image
     View3u8 make_view_3(u32 width, u32 height, Buffer8& buffer);
 
     View4u8 make_view_4(u32 width, u32 height, Buffer8& buffer);
+}
+
+
+/* select_channel */
+
+namespace image
+{
+    template <typename T, u32 C>
+    inline MatrixView2D<T> select_channel(ChannelMatrix2D<T, C> const& src, u32 ch)
+    {
+        MatrixView2D<T> view{};
+
+        view.width = src.width;
+        view.height = src.height;
+
+        view.matrix_data_ = src.channel_data[ch];
+
+        return view;
+    }
+
 }
 
 

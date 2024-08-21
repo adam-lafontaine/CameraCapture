@@ -147,21 +147,21 @@ namespace input_display
 
 namespace input_display
 {
-    constexpr auto WHITE = img::to_pixel(255, 255, 255);
-    constexpr auto BLACK = img::to_pixel(0, 0, 0);
-    constexpr auto TRANSPARENT = img::to_pixel(0, 0, 0, 0);
-    constexpr auto BLUE = img::to_pixel(0, 75, 168);
-    constexpr auto LIGHT_BLUE = img::to_pixel(23, 190, 187);
-    constexpr auto GRAY = img::to_pixel(115, 140, 153);
+    constexpr auto PX_WHITE = img::to_pixel(255, 255, 255);
+    constexpr auto PX_BLACK = img::to_pixel(0, 0, 0);
+    constexpr auto PX_TRANSPARENT = img::to_pixel(0, 0, 0, 0);
+    constexpr auto PX_BLUE = img::to_pixel(0, 75, 168);
+    constexpr auto PX_LIGHT_BLUE = img::to_pixel(23, 190, 187);
+    constexpr auto PX_GRAY = img::to_pixel(115, 140, 153);
 
 
     static constexpr std::array<Pixel, 5> COLOR_TABLE = 
     {
-        TRANSPARENT,
-        BLACK,
-        WHITE,      
-        BLUE,
-        LIGHT_BLUE
+        PX_TRANSPARENT,
+        PX_BLACK,
+        PX_WHITE,      
+        PX_BLUE,
+        PX_LIGHT_BLUE
     };
 
 
@@ -673,7 +673,7 @@ namespace input_display
 
     void update(input::Input const& input, IOState& state)
     {
-        img::fill(state.display, GRAY);
+        img::fill(state.display, PX_GRAY);
         update_controller_buttons(input, state);
         update_keyboard_buttons(input, state);
         update_mouse_buttons(input, state);

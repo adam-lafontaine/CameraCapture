@@ -218,10 +218,11 @@ namespace counts
 
         void* data = 0;
 
+        size_t const n_bytes = n_elements * ac.element_size;
+
 #if defined _WIN32
         data = std::calloc(n_elements, ac.element_size);
-#else
-        size_t const n_bytes = n_elements * ac.element_size;
+#else        
         data = std::aligned_alloc(ac.element_size, n_bytes);
 #endif
 

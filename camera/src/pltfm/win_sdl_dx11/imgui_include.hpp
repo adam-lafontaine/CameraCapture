@@ -2,109 +2,23 @@
 
 #include "imgui_options.hpp"
 
-#include "../../../libs/imgui/imgui.h"
+#include "../../../../libs/imgui/imgui.h"
 
-#include "../../../libs/imgui/backends/imgui_impl_sdl2.h"
-#include "../../../libs/imgui/backends/imgui_impl_opengl3.h"
+#include "../../../../libs/imgui/backends/imgui_impl_sdl2.h"
+#include "../../../../libs/imgui/backends/imgui_impl_dx11.h"
 
-#include <SDL.h>
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <SDL_opengles2.h>
-#else
-#include <SDL_opengl.h>
-#endif
+#include <d3d11.h>
 
-
-/* opengl */
-
-namespace ogl
-{
-    static inline const char* get_glsl_version()
-    {
-        // Decide GL+GLSL versions
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-        // GL ES 2.0 + GLSL 100
-        static constexpr const char* glsl_version = "#version 100";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#elif defined(__APPLE__)
-        // GL 3.2 Core + GLSL 150
-        static constexpr const char* glsl_version = "#version 150";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG); // Always required on Mac
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-#else
-        // GL 3.0 + GLSL 130
-        static constexpr const char* glsl_version = "#version 130";
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#endif
-
-        return glsl_version;
-    }
+#define SDL_MAIN_HANDLED
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
 
 
-    struct TextureId { int value = -1; };
-
-
-    template <size_t N>
-    class TextureList
-    {
-    public:
-        static constexpr size_t count = N;
-
-        GLuint data[count] = { 0 };
-    };
-
-
-    template <size_t N>
-    static inline TextureList<N> create_textures()
-    {
-        TextureList<N> textures{};
-
-        glGenTextures((GLsizei)N, textures.data);
-
-        for (int i = 0; i < textures.count; i++)
-        {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textures.data[i]);
-
-            // Setup filtering parameters for display
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
-        }
-        
-        return textures;
-    }
-
-
-    template <typename P>
-    static inline void render_to_texture(P* data, int width, int height, TextureId texture)
-    {
-        static_assert(sizeof(P) == 4);
-
-        assert(texture.value >= 0);
-
-        glActiveTexture(GL_TEXTURE0 + texture.value);
-
-#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-#endif
-        glTexImage2D(
-            GL_TEXTURE_2D, 0, GL_RGBA, 
-            (GLsizei)width, 
-            (GLsizei)height,
-            0, GL_RGBA, GL_UNSIGNED_BYTE, 
-            (GLvoid*)data);
-    }
-}
+// Data
+static ID3D11Device*            g_pd3dDevice = nullptr;
+static ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
+static IDXGISwapChain*          g_pSwapChain = nullptr;
+static ID3D11RenderTargetView*  g_mainRenderTargetView = nullptr;
 
 
 namespace ui
@@ -183,23 +97,17 @@ namespace ui
 
 namespace ui
 {
-    static inline SDL_Window* create_sdl_ogl_window(const char* title, int width, int height)
+    static inline SDL_Window* create_sdl_dx11_window(const char* title, int width, int height)
     {
-        // Create window with graphics context
-        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-        SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-
-        SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        SDL_Window* window = 
-            SDL_CreateWindow(
-                title, 
-                SDL_WINDOWPOS_CENTERED, 
-                SDL_WINDOWPOS_CENTERED, 
-                width, 
-                height, 
-                window_flags);
-
+        SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        SDL_Window* window = SDL_CreateWindow(
+            title, 
+            SDL_WINDOWPOS_CENTERED, 
+            SDL_WINDOWPOS_CENTERED, 
+            width,
+            height,
+            window_flags);
+        
         return window;
     }
 
@@ -232,5 +140,114 @@ namespace ui
         auto& style = ImGui::GetStyle();
         style.Colors[ImGuiCol_Text] = TEXT_WHITE;
         style.TabRounding = 0.0f;
+    }
+}
+
+
+namespace dx11
+{
+    // https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
+
+    struct TextureId { int value = -1; };
+
+    
+    class Texture
+    {
+    public:
+        ID3D11Texture2D *pTexture = 0;
+        ID3D11ShaderResourceView* srv;
+        TextureId id;
+
+        int image_width;
+        int image_height;
+        void* image_data;
+    };
+
+    template <size_t N>
+    class TextureList
+    {
+    public:
+        static constexpr size_t count = N;
+
+        Texture data[count] = { 0 };
+
+        Texture& get(TextureId id) { return data[id.value]; }
+    };
+
+
+    template <size_t N>
+    static inline TextureList<N> create_textures()
+    {
+        TextureList<N> textures{};
+
+        for (int i = 0; i < textures.count; i++)
+        {
+            auto& texture = textures.data[i];
+            texture.id.value = i;
+        }
+
+        return textures;
+    }
+
+
+    template <typename P>
+    static inline void init_texture(P* data, int width, int height, Texture& texture)
+    {
+        static_assert(sizeof(P) == 4);
+
+        texture.image_data = (void*)data;
+        texture.image_width = width;
+        texture.image_height = height;
+        
+        auto& pTexture = texture.pTexture;
+        auto& srv = texture.srv;
+
+        D3D11_TEXTURE2D_DESC desc;
+        ZeroMemory(&desc, sizeof(desc));
+        desc.Width = width;
+        desc.Height = height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        desc.CPUAccessFlags = 0;        
+
+        D3D11_SUBRESOURCE_DATA subResource;
+        subResource.pSysMem = (void*)data;
+        subResource.SysMemPitch = desc.Width * 4;
+        subResource.SysMemSlicePitch = 0;
+        g_pd3dDevice->CreateTexture2D(&desc, &subResource, &pTexture);
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+        ZeroMemory(&srvDesc, sizeof(srvDesc));
+        srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = desc.MipLevels;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+        g_pd3dDevice->CreateShaderResourceView(pTexture, &srvDesc, &srv);
+        //pTexture->Release();
+
+        g_pd3dDeviceContext->PSSetShaderResources(0, 1, &srv);
+    }
+    
+
+    static inline void render_texture(Texture& texture)
+    {
+        g_pd3dDeviceContext->UpdateSubresource(
+            texture.pTexture, 
+            0, 0, 
+            texture.image_data,
+            texture.image_width * 4, 
+            0);
+
+        g_pd3dDeviceContext->PSSetShaderResources(0, 1, &texture.srv);
+    }
+
+
+    static inline void display_texture(Texture const& texture, ImVec2 const& size)
+    {
+        ImGui::Image((void*)texture.srv, size);
     }
 }

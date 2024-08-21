@@ -3,7 +3,7 @@
 
 //#define LIBUVC_IMPLEMENTATION
 
-#define LIBUVC_HAS_JPEG 1
+//#define LIBUVC_HAS_JPEG 1
 
 #ifndef  NDEBUG
 //#define UVC_DEBUGGING
@@ -68,24 +68,30 @@ namespace uvc
     enum uvc_frame_format
     {
         UVC_FRAME_FORMAT_UNKNOWN = 0,
+
         /** Any supported format */
         UVC_FRAME_FORMAT_ANY = 0,
         UVC_FRAME_FORMAT_UNCOMPRESSED,
         UVC_FRAME_FORMAT_COMPRESSED,
+
         /** YUYV/YUV2/YUV422: YUV encoding with one luminance value per pixel and
          * one UV (chrominance) pair for every two pixels.
          */
         UVC_FRAME_FORMAT_YUYV,
         UVC_FRAME_FORMAT_UYVY,
+
         /** 24-bit RGB */
         UVC_FRAME_FORMAT_RGB,
         UVC_FRAME_FORMAT_BGR,
+
         /** Motion-JPEG (or JPEG) encoded images */
         UVC_FRAME_FORMAT_MJPEG,
         UVC_FRAME_FORMAT_H264,
+
         /** Greyscale images */
         UVC_FRAME_FORMAT_GRAY8,
         UVC_FRAME_FORMAT_GRAY16,
+
         /* Raw colour mosaic images */
         UVC_FRAME_FORMAT_BY8,
         UVC_FRAME_FORMAT_BA81,
@@ -93,10 +99,13 @@ namespace uvc
         UVC_FRAME_FORMAT_SGBRG8,
         UVC_FRAME_FORMAT_SRGGB8,
         UVC_FRAME_FORMAT_SBGGR8,
+
         /** YUV420: NV12 */
         UVC_FRAME_FORMAT_NV12,
+
         /** YUV: P010 */
         UVC_FRAME_FORMAT_P010,
+
         /** Number of formats understood */
         UVC_FRAME_FORMAT_COUNT,
     };
@@ -872,6 +881,31 @@ namespace uvc
 {
 namespace opt
 {
+    class FrameFormat
+    {
+    public:
+        u32 four_cc_bytes = 0;
+        u32 width = 0;
+        u32 height = 0;
+        u32 interval = 0;
+
+        b8 ok = 0;
+    };
+
+    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps);
+
+
+
+    uvc_format_desc* find_format_desc(uvc_device_handle *devh, u32 four_cc_bytes);
+
+    uvc_error_t uvc_get_stream_ctrl_format_size(
+        uvc_device_handle_t *devh,
+        uvc_stream_ctrl_t *ctrl,
+        u32 four_cc_bytes,
+        int width, int height,
+        int fps);
+
+
 #ifdef LIBUVC_HAS_JPEG
     error mjpeg2rgba(frame* in, u8* out);
     error mjpeg2gray(frame* in, u8* out);
@@ -2479,6 +2513,7 @@ namespace uvc
 
         return NULL;
     }
+
 
     /** Get a negotiated streaming control block for some common parameters.
      * @ingroup streaming
@@ -9193,6 +9228,8 @@ namespace uvc
 
 /* frame_mjpeg.c */
 
+#ifdef LIBUVC_HAS_JPEG
+
 namespace uvc
 {
     extern uvc_error_t uvc_ensure_frame_size(uvc_frame_t *frame, size_t need_bytes);
@@ -9390,11 +9427,165 @@ namespace uvc
     
 }
 
+#endif
 
 namespace uvc
 {
 namespace opt
 { 
+    
+
+
+    uvc_format_desc* find_format_desc(uvc_device_handle *devh, u32 four_cc_bytes)
+    {
+        uvc_streaming_interface* stream_if;
+        DL_FOREACH(devh->info->stream_ifs, stream_if)
+        {
+            uvc_format_desc* format;
+            DL_FOREACH(stream_if->format_descs, format)
+            {
+                if (*(u32*)(format->fourccFormat) == four_cc_bytes)
+                {
+                    return format;
+                }
+            }
+        }
+
+        return 0;
+    }
+
+
+    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps)
+    {
+        FrameFormat ff;
+        ff.interval = 0;
+        u32 max_interval = 10000000 / min_fps;
+
+        uvc_streaming_interface* stream_if;
+        DL_FOREACH(devh->info->stream_ifs, stream_if)
+        {
+            uvc_format_desc* format;
+            DL_FOREACH(stream_if->format_descs, format)
+            {
+                if (*(u32*)(format->fourccFormat) != four_cc_bytes)
+                {
+                    continue;
+                }
+
+                ff.four_cc_bytes = four_cc_bytes;
+
+                uvc_frame_desc_t *frame;
+                DL_FOREACH(format->frame_descs, frame)
+                {
+                    if (!frame->intervals)
+                    {
+                        continue;
+                    }
+
+                    for (u32* interval = frame->intervals; *interval; ++interval)
+                    {
+                        if (*interval > max_interval)
+                        {
+                            continue;
+                        }
+
+                        if (!ff.interval || *interval < ff.interval)
+                        {
+                            ff.interval = *interval;
+                            ff.width = frame->wWidth;
+                            ff.height = frame->wHeight;
+                            ff.ok = 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        return ff;
+    }
+
+
+    uvc_error_t uvc_get_stream_ctrl_format_size(
+        uvc_device_handle_t *devh,
+        uvc_stream_ctrl_t *ctrl,
+        u32 four_cc_bytes,
+        int width, int height,
+        int fps)
+    {
+        uvc_streaming_interface_t *stream_if;
+
+        /* find a matching frame descriptor and interval */
+        DL_FOREACH(devh->info->stream_ifs, stream_if)
+        {
+            uvc_format_desc_t *format;
+
+            DL_FOREACH(stream_if->format_descs, format)
+            {
+                if (*(u32*)(format->fourccFormat) != four_cc_bytes)
+                {
+                    continue;
+                }
+
+                uvc_frame_desc_t *frame;
+                DL_FOREACH(format->frame_descs, frame)
+                {
+                    if (frame->wWidth != width || frame->wHeight != height)
+                        continue;
+
+                    uint32_t *interval;
+
+                    ctrl->bInterfaceNumber = stream_if->bInterfaceNumber;
+                    UVC_DEBUG("claiming streaming interface %d", stream_if->bInterfaceNumber);
+                    uvc_claim_if(devh, ctrl->bInterfaceNumber);
+                    /* get the max values */
+                    uvc_query_stream_ctrl(devh, ctrl, 1, UVC_GET_MAX);
+
+                    if (frame->intervals)
+                    {
+                        for (interval = frame->intervals; *interval; ++interval)
+                        {
+                            // allow a fps rate of zero to mean "accept first rate available"
+                            if (10000000 / *interval == (unsigned int)fps || fps == 0)
+                            {
+
+                                ctrl->bmHint = (1 << 0); /* don't negotiate interval */
+                                ctrl->bFormatIndex = format->bFormatIndex;
+                                ctrl->bFrameIndex = frame->bFrameIndex;
+                                ctrl->dwFrameInterval = *interval;
+
+                                goto found;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        uint32_t interval_100ns = 10000000 / fps;
+                        uint32_t interval_offset = interval_100ns - frame->dwMinFrameInterval;
+
+                        if (interval_100ns >= frame->dwMinFrameInterval && interval_100ns <= frame->dwMaxFrameInterval && !(interval_offset && (interval_offset % frame->dwFrameIntervalStep)))
+                        {
+
+                            ctrl->bmHint = (1 << 0);
+                            ctrl->bFormatIndex = format->bFormatIndex;
+                            ctrl->bFrameIndex = frame->bFrameIndex;
+                            ctrl->dwFrameInterval = interval_100ns;
+
+                            goto found;
+                        }
+                    }
+                }
+            }
+        }
+
+        return UVC_ERROR_INVALID_MODE;
+
+    found:
+        return uvc_probe_stream_ctrl(devh, ctrl);
+    }
+    
+
+#ifdef LIBUVC_HAS_JPEG
+
     enum class jpeg_out_format : int
     {
         UNKNOWN,
@@ -9402,9 +9593,6 @@ namespace opt
         RGBA8,
         GRAY8
     };
-    
-
-#ifdef LIBUVC_HAS_JPEG
 
     class jpeg_info_t
     {
