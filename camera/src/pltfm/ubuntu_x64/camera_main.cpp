@@ -19,14 +19,6 @@ namespace img = image;
 namespace cdsp = camera_display;
 
 
-constexpr f64 NANO = 1'000'000'000;
-constexpr f64 MICRO = 1'000'000;
-
-constexpr f64 TARGET_FRAMERATE_HZ = 60.0;
-constexpr f64 TARGET_NS_PER_FRAME = NANO / TARGET_FRAMERATE_HZ;
-
-
-
 static void set_game_window_icon(SDL_Window* window)
 {
 #include "../../../../resources/icon_64.c" // this will "paste" the struct my_icon into this function
