@@ -137,8 +137,11 @@ static bool init_input_display()
         return false;
     }
 
-    auto& io_display = io_state.display;
-    ogl::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
+    auto data = io_state.display.matrix_data_;
+    auto w = io_state.display.width;
+    auto h = io_state.display.height;
+
+    ogl::init_texture(data, w, h, textures.get(input_texture_id));
     
 #endif
 
@@ -157,8 +160,9 @@ static void init_camera_display()
 
     cdsp::init_async(camera_state);
 
-    auto& camera_display = camera_state.display;
-    ogl::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
+    auto data = camera_state.display.matrix_data_;
+
+    ogl::init_texture(data, w, h, textures.get(camera_texture_id));
 }
 
 
@@ -298,6 +302,7 @@ static void render_imgui_frame()
 
     ImGui::Render();
     
+    // TODO: ogl::render();
     glClear(GL_COLOR_BUFFER_BIT);
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

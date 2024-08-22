@@ -15,10 +15,10 @@
 
 
 // Data
-static ID3D11Device*            g_pd3dDevice = nullptr;
+/*static ID3D11Device*            g_pd3dDevice = nullptr;
 static ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
 static IDXGISwapChain*          g_pSwapChain = nullptr;
-static ID3D11RenderTargetView*  g_mainRenderTargetView = nullptr;
+static ID3D11RenderTargetView*  g_mainRenderTargetView = nullptr;*/
 
 
 namespace ui
@@ -146,6 +146,109 @@ namespace ui
 
 namespace dx11
 {
+    class Context
+    {
+    public:
+        ID3D11Device*            pd3dDevice = nullptr;
+        ID3D11DeviceContext*     pd3dDeviceContext = nullptr;
+        IDXGISwapChain*          pSwapChain = nullptr;
+        ID3D11RenderTargetView*  mainRenderTargetView = nullptr;
+    };
+
+
+    static void create_render_target(Context& ctx)
+    {
+        ID3D11Texture2D* pBackBuffer;
+        ctx.pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
+        ctx.pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &ctx.mainRenderTargetView);
+        pBackBuffer->Release();
+    }
+
+
+    static void cleanup_render_target(Context& ctx)
+    {
+        if (ctx.mainRenderTargetView) { ctx.mainRenderTargetView->Release(); ctx.mainRenderTargetView = nullptr; }
+    }
+
+
+    static bool init_context(Context& ctx, HWND hWnd)
+    {
+        // Setup swap chain
+        DXGI_SWAP_CHAIN_DESC sd;
+        ZeroMemory(&sd, sizeof(sd));
+        sd.BufferCount = 2;
+        sd.BufferDesc.Width = 0;
+        sd.BufferDesc.Height = 0;
+        sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        sd.BufferDesc.RefreshRate.Numerator = 60;
+        sd.BufferDesc.RefreshRate.Denominator = 1;
+        sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+        sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        sd.OutputWindow = hWnd;
+        sd.SampleDesc.Count = 1;
+        sd.SampleDesc.Quality = 0;
+        sd.Windowed = TRUE;
+        sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+        UINT createDeviceFlags = 0;
+        //createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+        D3D_FEATURE_LEVEL featureLevel;
+        const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
+
+        auto res = D3D11CreateDeviceAndSwapChain(
+            nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 
+            createDeviceFlags, featureLevelArray, 2, 
+            D3D11_SDK_VERSION, &sd, 
+            &ctx.pSwapChain, 
+            &ctx.pd3dDevice, 
+            &featureLevel, 
+            &ctx.pd3dDeviceContext
+            );
+        
+        if (res != S_OK)
+        {
+            return false;
+        }            
+
+        create_render_target(ctx);
+        return true;
+    }
+
+
+    static void close_context(Context& ctx)
+    {
+        auto const release = [](auto& p) 
+        {
+            if (p)
+            {
+                p->Release();
+                p = nullptr;
+            }
+        };
+
+        release(ctx.mainRenderTargetView);
+        release(ctx.pSwapChain);
+        release(ctx.pd3dDeviceContext);
+        release(ctx.pd3dDevice);
+    }
+
+
+    static void render(Context& ctx, ImVec4 clear_color)
+    {
+        const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
+        
+        ctx.pd3dDeviceContext->OMSetRenderTargets(1, &ctx.mainRenderTargetView, nullptr);
+        ctx.pd3dDeviceContext->ClearRenderTargetView(ctx.mainRenderTargetView, clear_color_with_alpha);
+        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+        ctx.pSwapChain->Present(1, 0); // Present with vsync
+        //ctx.pSwapChain->Present(0, 0); // Present without vsync
+    }
+}
+
+
+namespace dx11
+{
     // https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
 
     struct TextureId { int value = -1; };
@@ -191,7 +294,7 @@ namespace dx11
 
 
     template <typename P>
-    static inline void init_texture(P* data, int width, int height, Texture& texture)
+    static inline void init_texture(P* data, int width, int height, Texture& texture, Context& ctx)
     {
         static_assert(sizeof(P) == 4);
 
@@ -218,7 +321,7 @@ namespace dx11
         subResource.pSysMem = (void*)data;
         subResource.SysMemPitch = desc.Width * 4;
         subResource.SysMemSlicePitch = 0;
-        g_pd3dDevice->CreateTexture2D(&desc, &subResource, &pTexture);
+        ctx.pd3dDevice->CreateTexture2D(&desc, &subResource, &pTexture);
 
         D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
         ZeroMemory(&srvDesc, sizeof(srvDesc));
@@ -226,23 +329,22 @@ namespace dx11
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Texture2D.MipLevels = desc.MipLevels;
         srvDesc.Texture2D.MostDetailedMip = 0;
-        g_pd3dDevice->CreateShaderResourceView(pTexture, &srvDesc, &srv);
-        //pTexture->Release();
+        ctx.pd3dDevice->CreateShaderResourceView(pTexture, &srvDesc, &srv);
 
-        g_pd3dDeviceContext->PSSetShaderResources(0, 1, &srv);
+        ctx.pd3dDeviceContext->PSSetShaderResources(0, 1, &srv);
     }
     
 
-    static inline void render_texture(Texture& texture)
+    static inline void render_texture(Texture& texture, Context& ctx)
     {
-        g_pd3dDeviceContext->UpdateSubresource(
+        ctx.pd3dDeviceContext->UpdateSubresource(
             texture.pTexture, 
             0, 0, 
             texture.image_data,
             texture.image_width * 4, 
             0);
 
-        g_pd3dDeviceContext->PSSetShaderResources(0, 1, &texture.srv);
+        ctx.pd3dDeviceContext->PSSetShaderResources(0, 1, &texture.srv);
     }
 
 
