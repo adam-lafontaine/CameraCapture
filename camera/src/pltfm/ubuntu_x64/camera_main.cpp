@@ -9,10 +9,6 @@ namespace idsp = input_display;
 
 #include "../../camera_display/camera_display.hpp"
 #include "../../../../libs/sdl/sdl_include.hpp"
-#include "../../../../libs/util/stopwatch.hpp"
-
-
-#include <thread>
 
 
 namespace img = image;
