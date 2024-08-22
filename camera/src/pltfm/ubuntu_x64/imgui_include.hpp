@@ -178,6 +178,31 @@ namespace ogl
     }
 
 
+    static void render(SDL_Window* window, SDL_GLContext gl_context)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            SDL_Window* backup_current_window = SDL_GL_GetCurrentWindow();
+            SDL_GL_MakeCurrent(window, gl_context);
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            SDL_GL_MakeCurrent(backup_current_window, gl_context);
+        }
+
+        SDL_GL_SwapWindow(window);
+    }
+}
+
+
+/* opengl texture */
+
+namespace ogl
+{
 
     // https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
 

@@ -302,20 +302,7 @@ static void render_imgui_frame()
 
     ImGui::Render();
     
-    // TODO: ogl::render();
-    glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    if ((*ui_state.io).ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        SDL_Window* backup_current_window = SDL_GL_GetCurrentWindow();
-        SDL_GL_MakeCurrent(window, gl_context);
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        SDL_GL_MakeCurrent(backup_current_window, gl_context);
-    }
-
-    SDL_GL_SwapWindow(window);    
+    ogl::render(window, gl_context);        
 }
 
 
@@ -353,7 +340,7 @@ static bool main_init()
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO();
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
@@ -361,9 +348,8 @@ static bool main_init()
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;    
 
     // Setup Platform/Renderer backends
-    auto glsl_version = ogl::get_glsl_version();
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui_ImplOpenGL3_Init(ogl::get_glsl_version());
 
     ui::set_imgui_style();
 
