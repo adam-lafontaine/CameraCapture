@@ -98,11 +98,12 @@ vendor and product ID of your webcams.
     {
 #ifndef NDEBUG
 
-    printf("\n********** LINUX PERMISSIONS MESSAGE **********\n\n");
-
-    printf("Libuvc requires RW permissions for opening capturing devices, so you must create the following .rules file:\n\n");
-    printf("/etc/udev/rules.d/99-uvc.rules\n\n");
-    printf("Add the following line(s) to register each device:\n\n");
+    printf(
+        "\n********** LINUX PERMISSIONS MESSAGE **********\n\n"
+        "Libuvc requires RW permissions for opening capturing devices, so you must create the following .rules file:\n\n"
+        "/etc/udev/rules.d/99-uvc.rules\n\n"
+        "Add the following line(s) to register each device:\n\n"
+        );
 
     auto const fmt = "SUBSYSTEMS==\"usb\", ENV{DEVTYPE}==\"usb_device\", ATTRS{idVendor}==\"%s\", ATTRS{idProduct}==\"%s\", MODE=\"0666\"\n";
 
@@ -112,9 +113,10 @@ vendor and product ID of your webcams.
         printf(fmt, cam.vendor_id, cam.product_id);
     }
 
-    printf("Restart the computer for the changes to take effect.");
-
-    printf("\n\n********** LINUX PERMISSIONS MESSAGE **********\n\n");
+    printf(
+        "\nRestart the computer for the changes to take effect."
+        "\n\n********** LINUX PERMISSIONS MESSAGE **********\n\n"
+        );
 
 #endif
     }

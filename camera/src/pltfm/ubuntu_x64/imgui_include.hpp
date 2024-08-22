@@ -178,6 +178,31 @@ namespace ogl
     }
 
 
+    static void render(SDL_Window* window, SDL_GLContext gl_context)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            SDL_Window* backup_current_window = SDL_GL_GetCurrentWindow();
+            SDL_GL_MakeCurrent(window, gl_context);
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            SDL_GL_MakeCurrent(backup_current_window, gl_context);
+        }
+
+        SDL_GL_SwapWindow(window);
+    }
+}
+
+
+/* opengl texture */
+
+namespace ogl
+{
 
     // https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
 
@@ -221,15 +246,6 @@ namespace ogl
             auto& texture = textures.data[i];
             texture.id.value = i;
             texture.gl_ref = textures.gl_ref_data[i];
-
-            /*glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, texture.gl_ref);
-
-            // Setup filtering parameters for display
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same*/
         }
         
         return textures;

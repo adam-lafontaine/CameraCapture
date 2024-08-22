@@ -1,13 +1,17 @@
 #include "imgui_include.hpp"
+
+#ifndef NDEBUG
 #include "../../input_display/input_display.hpp"
-#include "../../camera_display/camera_display.hpp"
 #include "../../diagnostics/diagnostics.hpp"
+
+namespace idsp = input_display;
+#endif
+
+#include "../../camera_display/camera_display.hpp"
 #include "../../../../libs/sdl/sdl_include.hpp"
-#include "../../../../libs/util/stopwatch.hpp"
 
 
 namespace img = image;
-namespace idsp = input_display;
 namespace cdsp = camera_display;
 
 
@@ -44,26 +48,13 @@ static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, inpu
 }
 
 
-static void ui_input_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
+static void texture_window(cstr title, dx11::Texture const& texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
-    ImGui::Begin("Input");
+    ImGui::Begin(title);
 
-    dx11::display_texture(texture, ImVec2(w, h));
-
-    ImGui::End();
-}
-
-
-static void ui_camera_window(dx11::Texture const& texture, u32 width, u32 height, f32 scale)
-{
-    auto w = width * scale;
-    auto h = height * scale;
-
-    ImGui::Begin("Camera");
-    
     dx11::display_texture(texture, ImVec2(w, h));
 
     ImGui::End();
@@ -75,17 +66,6 @@ static void ui_camera_controls_window(cdsp::CameraState& state)
     ImGui::Begin("Controls");
 
     camera_display::show_cameras(state);
-
-    ImGui::End();
-}
-
-
-static void ui_diagnostics_window()
-{
-    ImGui::Begin("Diagnostics");
-
-    diagnostics::show_memory();
-    diagnostics::show_uvc_memory();
 
     ImGui::End();
 }
@@ -107,34 +87,71 @@ namespace
     sdl::ControllerInput sdl_controller = {};
     u8 input_id_curr = 0;
     u8 input_id_prev = 1;
-
-    idsp::IOState io_state{};
+    
     cdsp::CameraState camera_state{};
-
     img::Buffer32 camera_buffer;
-
-    constexpr u32 N_TEXTURES = 2;
-    constexpr dx11::TextureId input_texture_id = { 0 };
-    constexpr dx11::TextureId camera_texture_id = { 1 };
-    dx11::TextureList<N_TEXTURES> textures;
+    
+    constexpr dx11::TextureId camera_texture_id = { 0 };    
 
     ui::UIState ui_state{};
     SDL_Window* window = 0;
     
     RunState run_state = RunState::Begin;
 
-    Stopwatch main_sw;
-    f64 main_frame_ns;
+#ifndef NDEBUG
+
+    idsp::IOState io_state{};
+    constexpr dx11::TextureId input_texture_id = { 1 };
+    constexpr u32 N_TEXTURES = 2;
+
+#else
+
+    constexpr u32 N_TEXTURES = 1;
+
+#endif
+
+    dx11::Context dx_ctx;
+    dx11::TextureList<N_TEXTURES> textures;
 }
 
 
+static bool init_input_display()
+{
+#ifndef NDEBUG
+
+    if (!idsp::init(io_state))
+    {
+        sdl::print_message("Error: idsp::init()");
+        sdl::close();
+        return false;
+    }
+    
+    auto data = io_state.display.matrix_data_;
+    auto w = io_state.display.width;
+    auto h = io_state.display.height;
+
+    dx11::init_texture(data, w, h, textures.get(input_texture_id), dx_ctx);
+#endif
+
+    return true;
+}
 
 
-// Forward declarations of helper functions
-bool CreateDeviceD3D(HWND hWnd);
-void CleanupDeviceD3D();
-void CreateRenderTarget();
-void CleanupRenderTarget();
+static void init_camera_display()
+{
+    // TODO init camera app
+    u32 w = 640;
+    u32 h = 480;
+    camera_buffer = img::create_buffer32(w * h, "camera display");
+    camera_state.display = img::make_view(w, h, camera_buffer);
+    img::fill(camera_state.display, img::to_pixel(128));
+
+    cdsp::init_async(camera_state);
+
+    auto data = camera_state.display.matrix_data_;
+    
+    dx11::init_texture(data, w, h, textures.get(camera_texture_id), dx_ctx);
+}
 
 
 static void end_program()
@@ -181,10 +198,11 @@ static void handle_window_event(SDL_Event const& event, SDL_Window* window)
         // TODO
         int w, h;
         SDL_GetWindowSize(window, &w, &h);
+
         // Release all outstanding references to the swap chain's buffers before resizing.
-        CleanupRenderTarget();
-        g_pSwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
-        CreateRenderTarget();
+        dx11::cleanup_render_target(dx_ctx);
+        dx_ctx.pSwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
+        dx11::create_render_target(dx_ctx);
     };
 
     auto const window_close = [&]()
@@ -286,23 +304,18 @@ static void render_imgui_frame()
     ui::show_imgui_demo(ui_state);
 #endif
 
-    ui_input_window(textures.get(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
-    ui_camera_window(textures.get(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
+#ifndef NDEBUG
+    texture_window("Input", textures.get(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
+    diagnostics::show_diagnostics();
+#endif
+    
+    texture_window("Camera", textures.get(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
     ui_camera_controls_window(camera_state);
-
-    ui_diagnostics_window();
 
     ImGui::Render();
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
-    g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
-    g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color_with_alpha);
-    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-    g_pSwapChain->Present(1, 0); // Present with vsync
-    //g_pSwapChain->Present(0, 0); // Present without vsync
+    dx11::render(dx_ctx, clear_color);    
 }
 
 
@@ -346,10 +359,10 @@ static bool main_init()
     HWND hwnd = (HWND)wmInfo.info.win.window;
 
     // Initialize Direct3D
-    if (!CreateDeviceD3D(hwnd))
+    if (!dx11::init_context(dx_ctx, hwnd))
     {
-        CleanupDeviceD3D();
-        return 1;
+        dx11::close_context(dx_ctx);
+        return false;
     }
 
     // Setup Dear ImGui context
@@ -364,34 +377,19 @@ static bool main_init()
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForD3D(window);
-    ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+    ImGui_ImplDX11_Init(dx_ctx.pd3dDevice, dx_ctx.pd3dDeviceContext);
 
     ui::set_imgui_style();
     ui_state.io = &io;
 
-    // TODO init camera app
-    u32 w = 640;
-    u32 h = 480;
-    camera_buffer = img::create_buffer32(w * h, "camera display");
-    camera_state.display = img::make_view(w, h, camera_buffer);
-    img::fill(camera_state.display, img::to_pixel(128));
-
-    cdsp::init_async(camera_state);
-
-    if (!idsp::init(io_state))
-    {
-        sdl::print_message("Error: idsp::init()");
-        sdl::close();
-        return false;
-    }
-
     textures = dx11::create_textures<N_TEXTURES>();
 
-    auto& io_display = io_state.display;
-    dx11::init_texture(io_display.matrix_data_, io_display.width, io_display.height, textures.get(input_texture_id));
-    
-    auto& camera_display = camera_state.display;
-    dx11::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
+    init_camera_display();
+
+    if (!init_input_display())
+    {
+        return false;
+    }
 
     return true;
 }
@@ -399,15 +397,18 @@ static bool main_init()
 
 static void main_close()
 {
-    idsp::close(io_state);
     cdsp::close_async(camera_state);
+
+#ifndef NDEBUG
+    idsp::close(io_state);
+#endif    
 
     // Cleanup
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
-    CleanupDeviceD3D();
+    dx11::close_context(dx_ctx);
 
     SDL_DestroyWindow(window);
 
@@ -421,18 +422,18 @@ static void main_close()
 static void main_loop()
 {
     init_input();
-    main_sw.start();
     
     while(is_running())
     {
         process_user_input();
 
         auto& input = user_input[input_id_curr];
-        
+
+#ifndef NDEBUG        
         idsp::update(input, io_state);
-        
-        dx11::render_texture(textures.get(input_texture_id));
-        dx11::render_texture(textures.get(camera_texture_id));
+        dx11::render_texture(textures.get(input_texture_id), dx_ctx);
+#endif 
+        dx11::render_texture(textures.get(camera_texture_id), dx_ctx);
 
         render_imgui_frame(); 
     }
@@ -456,59 +457,6 @@ int main()
     main_close();
 
     return EXIT_SUCCESS;
-}
-
-
-// Helper functions to use DirectX11
-bool CreateDeviceD3D(HWND hWnd)
-{
-    // Setup swap chain
-    DXGI_SWAP_CHAIN_DESC sd;
-    ZeroMemory(&sd, sizeof(sd));
-    sd.BufferCount = 2;
-    sd.BufferDesc.Width = 0;
-    sd.BufferDesc.Height = 0;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.OutputWindow = hWnd;
-    sd.SampleDesc.Count = 1;
-    sd.SampleDesc.Quality = 0;
-    sd.Windowed = TRUE;
-    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-    UINT createDeviceFlags = 0;
-    //createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-    D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
-    if (D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext) != S_OK)
-        return false;
-
-    CreateRenderTarget();
-    return true;
-}
-
-void CleanupDeviceD3D()
-{
-    CleanupRenderTarget();
-    if (g_pSwapChain) { g_pSwapChain->Release(); g_pSwapChain = nullptr; }
-    if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
-    if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
-}
-
-void CreateRenderTarget()
-{
-    ID3D11Texture2D* pBackBuffer;
-    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-    g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_mainRenderTargetView);
-    pBackBuffer->Release();
-}
-
-void CleanupRenderTarget()
-{
-    if (g_mainRenderTargetView) { g_mainRenderTargetView->Release(); g_mainRenderTargetView = nullptr; }
 }
 
 
