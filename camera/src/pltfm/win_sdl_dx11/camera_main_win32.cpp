@@ -88,24 +88,30 @@ namespace
     sdl::ControllerInput sdl_controller = {};
     u8 input_id_curr = 0;
     u8 input_id_prev = 1;
-
-    idsp::IOState io_state{};
+    
     cdsp::CameraState camera_state{};
-
     img::Buffer32 camera_buffer;
-
-    constexpr u32 N_TEXTURES = 2;
-    constexpr dx11::TextureId input_texture_id = { 0 };
-    constexpr dx11::TextureId camera_texture_id = { 1 };
-    dx11::TextureList<N_TEXTURES> textures;
+    
+    constexpr dx11::TextureId camera_texture_id = { 0 };    
 
     ui::UIState ui_state{};
     SDL_Window* window = 0;
     
     RunState run_state = RunState::Begin;
 
-    Stopwatch main_sw;
-    f64 main_frame_ns;
+#ifndef NDEBUG
+
+    idsp::IOState io_state{};
+    constexpr dx11::TextureId input_texture_id = { 1 };
+    constexpr u32 N_TEXTURES = 2;
+
+#else
+
+    constexpr u32 N_TEXTURES = 1;
+
+#endif
+
+    dx11::TextureList<N_TEXTURES> textures;
 }
 
 
@@ -128,6 +134,20 @@ static bool init_input_display()
 }
 
 
+static void init_camera_display()
+{
+    // TODO init camera app
+    u32 w = 640;
+    u32 h = 480;
+    camera_buffer = img::create_buffer32(w * h, "camera display");
+    camera_state.display = img::make_view(w, h, camera_buffer);
+    img::fill(camera_state.display, img::to_pixel(128));
+
+    cdsp::init_async(camera_state);
+
+    auto& camera_display = camera_state.display;
+    dx11::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
+}
 
 
 // Forward declarations of helper functions
@@ -373,22 +393,12 @@ static bool main_init()
 
     textures = dx11::create_textures<N_TEXTURES>();
 
-    // TODO init camera app
-    u32 w = 640;
-    u32 h = 480;
-    camera_buffer = img::create_buffer32(w * h, "camera display");
-    camera_state.display = img::make_view(w, h, camera_buffer);
-    img::fill(camera_state.display, img::to_pixel(128));
-
-    cdsp::init_async(camera_state);
+    init_camera_display();
 
     if (!init_input_display())
     {
         return false;
     }
-    
-    auto& camera_display = camera_state.display;
-    dx11::init_texture(camera_display.matrix_data_, camera_display.width, camera_display.height, textures.get(camera_texture_id));
 
     return true;
 }
@@ -396,8 +406,11 @@ static bool main_init()
 
 static void main_close()
 {
-    idsp::close(io_state);
     cdsp::close_async(camera_state);
+
+#ifndef NDEBUG
+    idsp::close(io_state);
+#endif    
 
     // Cleanup
     ImGui_ImplDX11_Shutdown();
@@ -418,17 +431,17 @@ static void main_close()
 static void main_loop()
 {
     init_input();
-    main_sw.start();
     
     while(is_running())
     {
         process_user_input();
 
         auto& input = user_input[input_id_curr];
-        
+
+#ifndef NDEBUG        
         idsp::update(input, io_state);
-        
         dx11::render_texture(textures.get(input_texture_id));
+#endif 
         dx11::render_texture(textures.get(camera_texture_id));
 
         render_imgui_frame(); 

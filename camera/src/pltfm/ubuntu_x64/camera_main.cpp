@@ -98,17 +98,11 @@ namespace
     sdl::ControllerInput sdl_controller = {};
     u8 input_id_curr = 0;
     u8 input_id_prev = 1;
-
-    idsp::IOState io_state{};
+    
     cdsp::CameraState camera_state{};
-
     img::Buffer32 camera_buffer;
     
-
-    constexpr u32 N_TEXTURES = 2;
-    constexpr ogl::TextureId input_texture_id = { 0 };
-    constexpr ogl::TextureId camera_texture_id = { 1 };
-    ogl::TextureList<N_TEXTURES> textures;
+    constexpr ogl::TextureId camera_texture_id = { 0 };    
 
     ui::UIState ui_state{};
     SDL_Window* window = 0;
@@ -116,8 +110,19 @@ namespace
     
     RunState run_state = RunState::Begin;
 
-    Stopwatch main_sw;
-    f64 main_frame_ns;
+#ifndef NDEBUG
+
+    idsp::IOState io_state{};
+    constexpr ogl::TextureId input_texture_id = { 1 };
+    constexpr u32 N_TEXTURES = 2;
+
+#else
+
+    constexpr u32 N_TEXTURES = 1;
+
+#endif
+
+    ogl::TextureList<N_TEXTURES> textures;
 }
 
 
@@ -377,7 +382,10 @@ static bool main_init()
 static void main_close()
 { 
     cdsp::close_async(camera_state);
-    idsp::close(io_state);    
+
+#ifndef NDEBUG
+    idsp::close(io_state);
+#endif     
     
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
@@ -396,17 +404,17 @@ static void main_close()
 static void main_loop()
 {
     init_input();
-    main_sw.start();
     
     while(is_running())
     {
         process_user_input();
 
         auto& input = user_input[input_id_curr];
-        
-        idsp::update(input, io_state);
 
+#ifndef NDEBUG
+        idsp::update(input, io_state);
         ogl::render_texture(textures.get(input_texture_id));
+#endif        
         ogl::render_texture(textures.get(camera_texture_id));
 
         render_imgui_frame();
