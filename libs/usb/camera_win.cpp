@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef _WIN32
+#error Windows only
+#endif
+
 #include "camera_usb.hpp"
 #include "../image/convert.hpp"
 #include "../util/numeric.hpp"

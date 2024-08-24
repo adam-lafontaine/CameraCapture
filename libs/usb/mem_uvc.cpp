@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef __linux__
+#error Linux only
+#endif
+
 #include <cstdlib>
 #include <string.h>
 

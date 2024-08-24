@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef __linux__
+#error Linux only
+#endif
+
 #include "camera_usb.hpp"
 #include "libuvc3.hpp"
 #include "../image/convert.hpp"
