@@ -45,44 +45,6 @@ namespace image
 }
 
 
-/* row_begin */
-
-namespace image
-{
-    template <typename T>
-    static inline T* row_begin(MatrixView2D<T> const& view, u32 y)
-    {
-        return view.matrix_data_ + (u64)y * view.width;
-    }
-
-
-    template <typename T>
-    static inline T* row_begin(MatrixSubView2D<T> const& view, u32 y)
-    {
-        return view.matrix_data_ + (u64)(view.y_begin + y) * view.matrix_width + view.x_begin;
-    }
-}
-
-
-/* xy_at */
-
-namespace image
-{
-    template <typename T>
-    static inline T* xy_at(MatrixView2D<T> const& view, u32 x, u32 y)
-    {
-        return row_begin(view, y) + x;
-    }
-
-
-    template <typename T>
-    static inline T* xy_at(MatrixSubView2D<T> const& view, u32 x, u32 y)
-    {
-        return row_begin(view, y) + x;
-    }
-}
-
-
 /* make_view */
 
 namespace image
@@ -188,6 +150,17 @@ namespace image
 
 
     void copy(ImageView const& src, ImageView const& dst)
+    {
+        assert(src.matrix_data_);
+        assert(dst.matrix_data_);
+        assert(dst.width == src.width);
+        assert(dst.height == src.height);
+
+        copy_view(src, dst);
+    }
+
+
+    void copy(GrayView const& src, GrayView const& dst)
     {
         assert(src.matrix_data_);
         assert(dst.matrix_data_);

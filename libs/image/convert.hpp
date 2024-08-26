@@ -143,9 +143,9 @@ namespace convert
     void convert_sub_view(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format);
 
 
-    using ViewYUV = img::View3<f32>;
+    using ViewYUV = img::View3<u8>;
 
-    ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer32& buffer);
+    ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer8& buffer);
 
 
     void to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format);

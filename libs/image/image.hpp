@@ -111,6 +111,22 @@ namespace image
 	}
 
 
+    inline Buffer32 create_buffer32(u32 n_pixels)
+	{
+		Buffer32 buffer;
+		mb::create_buffer(buffer, n_pixels);
+		return buffer;
+	}
+
+
+    inline Buffer8 create_buffer8(u32 n_pixels, cstr tag)
+	{
+		Buffer8 buffer;
+		mb::create_buffer(buffer, n_pixels, tag);
+		return buffer;
+	}
+
+
     inline Buffer32 create_buffer32(u32 n_pixels, cstr tag)
 	{
 		Buffer32 buffer;
@@ -230,6 +246,8 @@ namespace image
 namespace image
 {
     void copy(ImageView const& src, ImageView const& dst);
+
+    void copy(GrayView const& src, GrayView const& dst);
 }
 
 
@@ -260,6 +278,44 @@ namespace image
     bool read_image_from_file(const char* img_path_src, Image& image_dst);
 
     bool write_image(Image const& image_src, const char* file_path_dst);
+}
+
+
+/* row_begin */
+
+namespace image
+{
+    template <typename T>
+    static inline T* row_begin(MatrixView2D<T> const& view, u32 y)
+    {
+        return view.matrix_data_ + (u64)y * view.width;
+    }
+
+
+    template <typename T>
+    static inline T* row_begin(MatrixSubView2D<T> const& view, u32 y)
+    {
+        return view.matrix_data_ + (u64)(view.y_begin + y) * view.matrix_width + view.x_begin;
+    }
+}
+
+
+/* xy_at */
+
+namespace image
+{
+    template <typename T>
+    static inline T* xy_at(MatrixView2D<T> const& view, u32 x, u32 y)
+    {
+        return row_begin(view, y) + x;
+    }
+
+
+    template <typename T>
+    static inline T* xy_at(MatrixSubView2D<T> const& view, u32 x, u32 y)
+    {
+        return row_begin(view, y) + x;
+    }
 }
 
 
