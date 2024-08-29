@@ -451,7 +451,7 @@ namespace camera_usb
     }
 
 
-    static bool grab_and_convert_frame_rgba(DeviceUVC& device)
+    static bool grab_and_convert_frame_rgba(DeviceUVC& device, img::ImageView const& dst)
     {
         uvc::frame* frame;
 
@@ -468,7 +468,7 @@ namespace camera_usb
         auto h = device.config.frame_height;
 
         cvt::to_yuv(span, w, h, device.yuv, format);
-        cvt::yuv_to_rgba(device.yuv, device.rgba);
+        cvt::yuv_to_rgba(device.yuv, dst);
         
         return res == uvc::UVC_SUCCESS;
     }
@@ -610,11 +610,7 @@ namespace camera_usb
         
         device.grab_sw.start();
 
-        if (grab_and_convert_frame_rgba(device))
-        {
-            img::copy(device.rgba, dst);
-        }
-        else
+        if (!grab_and_convert_frame_rgba(device, dst))
         {
             img::fill(dst, img::to_pixel(0, 0, 255));
         }
@@ -628,6 +624,7 @@ namespace camera_usb
 
     void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition)
     {
+        camera.busy = 1;
         auto& device = uvc_list.devices[camera.id];
 
         auto c_status = camera.status;
@@ -637,14 +634,16 @@ namespace camera_usb
         while (stream_condition())
         {
             device.grab_sw.start();
-            if (grab_and_convert_frame_rgba(device))
+            if (grab_and_convert_frame_rgba(device, device.rgba))
             {
                 on_grab(device.rgba);
             }
+
             device.grab_ms = device.grab_sw.get_time_milli();
             camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
         }
 
+        camera.busy = 0;
         camera.status = c_status;
     }
 }

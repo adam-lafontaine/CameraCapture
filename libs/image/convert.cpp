@@ -24,6 +24,52 @@ namespace convert
         u8 u;
         u8 v;
     };
+
+
+    constexpr OffsetYUYV offset_yuyv(PixelFormat pf)
+    {
+        using PF = PixelFormat;
+
+        OffsetYUYV yuyv{};
+
+        switch (pf)
+        {
+        case PF::YUYV:
+        case PF::YUNV:
+        case PF::YUY2:            
+            yuyv.y1 = 0;
+            yuyv.u  = 1;
+            yuyv.y2 = 2;
+            yuyv.v  = 3;
+            break;
+        
+        case PF::YVYU:
+            yuyv.y1 = 0;
+            yuyv.v  = 1;
+            yuyv.y2 = 2;
+            yuyv.u  = 3;
+            break;
+        
+        case PF::UYVY:
+        case PF::Y422:
+        case PF::UYNV:
+        case PF::HDYC:
+            yuyv.u  = 0;
+            yuyv.y1 = 1;
+            yuyv.v  = 2;
+            yuyv.y2 = 3;
+            break;
+
+        default:
+            yuyv.y1 = 0;
+            yuyv.y2 = 0;
+            yuyv.u  = 0;
+            yuyv.v  = 0;
+
+        }
+
+        return yuyv;
+    }
     
 
     static void yuyv_to_planar(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
@@ -396,86 +442,20 @@ namespace convert
 
 namespace convert
 {
-    void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
+    void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst, PixelFormat format)
     {
         assert(src.length == dst.width * dst.height * 2);
 
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.u  = 1;
-        yuyv.y2 = 2;
-        yuyv.v  = 3;
-
+        auto yuyv = offset_yuyv(format);
         span_yuyv_to_view(src, dst, yuyv);
     }
 
 
-    void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
+    void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format)
     {
         assert(src.length == dst.width * dst.height * 2);
 
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.u  = 1;
-        yuyv.y2 = 2;
-        yuyv.v  = 3;
-
-        span_yuyv_to_sub_view(src, dst, yuyv);
-    }
-
-
-    void yvyu_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.v  = 1;
-        yuyv.y2 = 2;
-        yuyv.u  = 3;
-
-        span_yuyv_to_view(src, dst, yuyv);
-    }
-
-
-    void yvyu_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.v  = 1;
-        yuyv.y2 = 2;
-        yuyv.u  = 3;
-
-        span_yuyv_to_sub_view(src, dst, yuyv);
-    }
-
-
-    void uyvy_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.u  = 0;
-        yuyv.y1 = 1;
-        yuyv.v  = 2;
-        yuyv.y2 = 3;
-
-        span_yuyv_to_view(src, dst, yuyv);
-    }
-
-
-    void uyvy_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.u  = 0;
-        yuyv.y1 = 1;
-        yuyv.v  = 2;
-        yuyv.y2 = 3;
-
+        auto yuyv = offset_yuyv(format);
         span_yuyv_to_sub_view(src, dst, yuyv);
     }
     
@@ -598,46 +578,13 @@ namespace convert
             break;
         }
     }
-    
-    
-    static void yuyv_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
+
+
+    static void yuyv_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format)
     {
         assert(src.length == width * height * 2);
 
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.u  = 1;
-        yuyv.y2 = 2;
-        yuyv.v  = 3;
-
-        yuyv_to_planar_scale(src, width, height, dst, yuyv);
-    }
-
-
-    static void yvyu_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
-    {
-        assert(src.length == width * height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.v  = 1;
-        yuyv.y2 = 2;
-        yuyv.u  = 3;
-
-        yuyv_to_planar_scale(src, width, height, dst, yuyv);
-    }
-
-
-    static void uyvy_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
-    {
-        assert(src.length == width * height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.u  = 0;
-        yuyv.y1 = 1;
-        yuyv.v  = 2;
-        yuyv.y2 = 3;
-
+        auto yuyv = offset_yuyv(format);
         yuyv_to_planar_scale(src, width, height, dst, yuyv);
     }
 
@@ -696,18 +643,12 @@ namespace convert
         case PF::YUYV:
         case PF::YUNV:
         case PF::YUY2:
-            yuyv_to_rgba(src, dst);
-            break;
-        
         case PF::YVYU:
-            yvyu_to_rgba(src, dst);
-            break;
-        
         case PF::UYVY:
         case PF::Y422:
         case PF::UYNV:
         case PF::HDYC:
-            uyvy_to_rgba(src, dst);
+            yuyv_to_rgba(src, dst, format);
             break;
 
         case PF::NV12:
@@ -729,18 +670,12 @@ namespace convert
         case PF::YUYV:
         case PF::YUNV:
         case PF::YUY2:
-            yuyv_to_rgba(src, dst);
-            break;
-        
         case PF::YVYU:
-            yvyu_to_rgba(src, dst);
-            break;
-        
         case PF::UYVY:
         case PF::Y422:
         case PF::UYNV:
         case PF::HDYC:
-            uyvy_to_rgba(src, dst);
+            yuyv_to_rgba(src, dst, format);
             break;
 
         case PF::NV12:
@@ -778,27 +713,18 @@ namespace convert
         {
         case PF::YUYV:
         case PF::YUNV:
-        case PF::YUY2:            
-            yuyv_to_yuv(src, width, height, dst);
-            break;
-        
+        case PF::YUY2:
         case PF::YVYU:
-            yvyu_to_yuv(src, width, height, dst);
-            break;
-        
         case PF::UYVY:
         case PF::Y422:
         case PF::UYNV:
         case PF::HDYC:
-            uyvy_to_yuv(src, width, height, dst);
+            yuyv_to_yuv(src, width, height, dst, format);
+
             break;
 
         case PF::NV12:
             nv12_to_yuv(src, width, height, dst);
-            break;
-
-        default:
-            //img::fill(dst, img::to_pixel(100));
             break;
         }
     }
