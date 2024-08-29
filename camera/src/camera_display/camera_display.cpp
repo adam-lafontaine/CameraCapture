@@ -252,11 +252,6 @@ namespace camera_display
     {
         auto const is_on = [&](){ return state.is_streaming; };
 
-        auto const on_grab = [&](img::ImageView const& frame)
-        { 
-            img::copy(frame, state.display);
-        };
-
         state.is_streaming = true;
 
         for (u32 i = 0; i < state.cameras.count; i++)
@@ -265,7 +260,7 @@ namespace camera_display
             c.busy = 1;
         }
         
-        cam::stream_camera(camera, on_grab, is_on);
+        cam::stream_camera(camera, state.display, is_on);
     }
 
 

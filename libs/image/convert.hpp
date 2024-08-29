@@ -132,6 +132,8 @@ namespace convert
 }
 
 
+/* api */
+
 namespace convert
 {
     namespace img = image;
@@ -143,7 +145,7 @@ namespace convert
     void convert_sub_view(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format);
 
 
-    using ViewYUV = img::View3<u8>;
+    using ViewYUV = img::View3u8;
 
     ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer8& buffer);
 
@@ -154,4 +156,7 @@ namespace convert
     void yuv_to_rgba(ViewYUV const& src, img::ImageView const& dst);
 
     void yuv_to_rgba(ViewYUV const& src, img::SubView const& dst);
+
+
+    void yuv_to_rgb(ViewYUV const& src, img::ViewRGBu8 const& dst);
 }

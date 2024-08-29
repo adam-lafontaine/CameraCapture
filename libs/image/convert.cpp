@@ -382,6 +382,19 @@ namespace convert
             a += S;
         }
     }
+
+
+    template <typename T>
+    static void yuv_to_rgb(T* y, T* u, T* v, u8* r, u8* g, u8* b, u32 len)
+    {
+        for (u32 i = 0; i < len; i++)
+        {
+            yuv_to_rgb(y[i], u[i], v[i], r, g, b);
+            ++r;
+            ++g;
+            ++b;
+        }
+    }
 }
 
 
@@ -720,7 +733,6 @@ namespace convert
         case PF::UYNV:
         case PF::HDYC:
             yuyv_to_yuv(src, width, height, dst, format);
-
             break;
 
         case PF::NV12:
@@ -767,6 +779,25 @@ namespace convert
             u += len;
             v += len;
         }
+    }
+
+
+    void yuv_to_rgb(ViewYUV const& src, img::ViewRGBu8 const& dst)
+    {
+        assert(src.width == dst.width);
+        assert(src.height == dst.height);
+
+        auto len = src.width * src.height;
+
+        auto y = src.channel_data[(u32)YUV::Y];
+        auto u = src.channel_data[(u32)YUV::U];
+        auto v = src.channel_data[(u32)YUV::V];
+
+        auto r = dst.channel_data[(u32)img::RGB::R];
+        auto g = dst.channel_data[(u32)img::RGB::G];
+        auto b = dst.channel_data[(u32)img::RGB::B];
+
+        yuv_to_rgb(y, u, v, r, g, b, len);
     }
 }
 
