@@ -48,14 +48,14 @@ static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, inpu
 }
 
 
-static void texture_window(cstr title, dx11::Texture const& texture, u32 width, u32 height, f32 scale)
+static void texture_window(cstr title, void* texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
     ImGui::Begin(title);
 
-    dx11::display_texture(texture, ImVec2(w, h));
+    ImGui::Image(texture, ImVec2(w, h));
 
     ImGui::End();
 }

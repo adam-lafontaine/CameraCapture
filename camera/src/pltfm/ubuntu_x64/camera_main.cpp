@@ -47,14 +47,14 @@ static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, inpu
 }
 
 
-static void texture_window(cstr title, ogl::Texture texture, u32 width, u32 height, f32 scale)
+static void texture_window(cstr title, void* texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
 
     ImGui::Begin(title);
 
-    ogl::display_texture(texture, ImVec2(w, h));
+    ImGui::Image(texture, ImVec2(w, h));
 
     ImGui::End();
 }
@@ -281,11 +281,11 @@ static void render_imgui_frame()
 #endif
 
 #ifndef NDEBUG
-    texture_window("Input", textures.get(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
+    texture_window("Input", textures.get_imgui_texture(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
     diagnostics::show_diagnostics();
 #endif
     
-    texture_window("Camera", textures.get(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
+    texture_window("Camera", textures.get_imgui_texture(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
     ui_camera_controls_window(camera_state);
 
     ImGui::Render();

@@ -231,6 +231,8 @@ namespace ogl
         GLuint gl_ref_data[count] = { 0 };
 
         Texture& get(TextureId id) { return data[id.value]; }
+
+        void* get_imgui_texture(TextureId id) { return (void*)(intptr_t)get(id).gl_ref; }
     };
 
 
@@ -289,11 +291,5 @@ namespace ogl
             (GLsizei)texture.image_height,
             0, GL_RGBA, GL_UNSIGNED_BYTE, 
             (GLvoid*)texture.image_data);
-    }
-
-
-    static inline void display_texture(Texture const& texture, ImVec2 const& size)
-    {
-        ImGui::Image((void*)(intptr_t)texture.gl_ref, size);
     }
 }
