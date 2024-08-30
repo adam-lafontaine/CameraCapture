@@ -94,4 +94,9 @@ namespace camera_usb
     void grab_planar_rgb(Camera& camera, img::View3u8 const& dst);
 
     void grab_planar_yuv(Camera& camera, img::View3u8 const& dst);
+
+    
+    void stream_planar_rgb(Camera& camera, planar_cb const& proc, bool_fn const& stream_condition);
+
+    void stream_planar_yuv(Camera& camera, planar_cb const& proc, bool_fn const& stream_condition);
 }
