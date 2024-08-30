@@ -364,6 +364,14 @@ namespace image
 
         for_each_in_span(to_span(view), func);
     }
+
+
+    void for_each_pixel(GrayView const& view, fn<void(u8)> const& func)
+    {
+        assert(view.matrix_data_);
+
+        for_each_in_span(to_span(view), func);
+    }
 }
 
 

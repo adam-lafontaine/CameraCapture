@@ -6,9 +6,6 @@
 
 namespace convert
 {
-    enum class YUV : u32 { Y = 0, U = 1, V = 2 };
-
-
     class OffsetYUYV
     {
     public:
@@ -698,23 +695,6 @@ namespace convert
         default:
             img::fill(dst, img::to_pixel(100));
         }
-    }
-    
-
-    ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer8& buffer)
-    {
-        auto len = width * height;
-
-        ViewYUV view{};
-
-        view.width = width;
-        view.height = height;
-
-        view.channel_data[0] = mb::push_elements(buffer, len);
-        view.channel_data[1] = mb::push_elements(buffer, len);
-        view.channel_data[2] = mb::push_elements(buffer, len);
-
-        return view; 
     }
 
 

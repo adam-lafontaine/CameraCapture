@@ -268,6 +268,8 @@ namespace image
 namespace image
 {
     void for_each_pixel(ImageView const& view, fn<void(Pixel)> const& func);
+
+    void for_each_pixel(GrayView const& view, fn<void(u8)> const& func);
 }
 
 

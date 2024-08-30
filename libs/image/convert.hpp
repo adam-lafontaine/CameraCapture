@@ -147,7 +147,19 @@ namespace convert
 
     using ViewYUV = img::View3u8;
 
-    ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer8& buffer);
+    enum class YUV : u32 { Y = 0, U = 1, V = 2 };
+
+
+    inline ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer8& buffer)
+    {
+        return img::make_view_3(width, height, buffer);
+    }
+
+
+    inline img::View1u8 select_y(ViewYUV const& view)
+    {
+        return img::select_channel(view, (u32)YUV::Y);
+    }
 
 
     void to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format);
