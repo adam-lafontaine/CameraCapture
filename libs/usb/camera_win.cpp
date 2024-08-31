@@ -337,6 +337,7 @@ namespace camera_usb
         u32 count = 0;
 
         img::Buffer32 data32;
+        img::Buffer8 data8;
     };
 }
 
@@ -575,9 +576,19 @@ namespace camera_usb
             return cameras;
         }
 
+        w32_list.data8 = img::create_buffer8(3 * n_pixels, "w32 data8");
+        if (!w32_list.data8.ok)
+        {
+            mb::destroy_buffer(w32_list.data32);
+            cameras.count = 0;
+            cameras.status = ConnectionStatus::Disconnected;
+            return cameras;
+        }
+
         if (!enumerate_devices(w32_list))
         {
             mb::destroy_buffer(w32_list.data32);
+            mb::destroy_buffer(w32_list.data8);
             cameras.count = 0;
             cameras.status = ConnectionStatus::Disconnected;
             return cameras;
@@ -610,6 +621,7 @@ namespace camera_usb
     void close(CameraList& cameras)
     {
         mb::destroy_buffer(w32_list.data32);
+        mb::destroy_buffer(w32_list.data8);
         close_devices(w32_list);
 
         for (u32 i = 0; i < cameras.count; i++)
@@ -640,14 +652,16 @@ namespace camera_usb
         camera.format = span::to_string_view(format.format_code);
 
         // only one at a time
-        auto& buffer = w32_list.data32;
+        auto& buffer32 = w32_list.data32;
+        auto& buffer8 = w32_list.data8;
         auto w = camera.frame_width;
         auto h = camera.frame_height;
-        mb::reset_buffer(buffer);
-        device.rgba = img::make_view(w, h, buffer);
-        device.view3 = convert::make_view_yuv(w, h, buffer);
+        mb::reset_buffer(buffer32);
+        mb::reset_buffer(buffer8);
+        device.rgba = img::make_view(w, h, buffer32);
+        device.view3 = convert::make_view_yuv(w, h, buffer8);
 
-        if (!buffer.ok)
+        if (!buffer32.ok || !buffer8.ok)
         {
             camera.busy = 0;
             return false;

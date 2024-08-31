@@ -305,11 +305,11 @@ static void render_imgui_frame()
 #endif
 
 #ifndef NDEBUG
-    texture_window("Input", textures.get(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
+    texture_window("Input", textures.get_imgui_texture(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
     diagnostics::show_diagnostics();
 #endif
     
-    texture_window("Camera", textures.get(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
+    texture_window("Camera", textures.get_imgui_texture(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
     ui_camera_controls_window(camera_state);
 
     ImGui::Render();

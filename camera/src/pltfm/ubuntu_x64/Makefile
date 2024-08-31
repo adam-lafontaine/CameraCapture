@@ -180,7 +180,6 @@ camera_usb_c += $(libuvc_h)
 camera_usb_c += $(mem_uvc_h)
 camera_usb_c += $(usb)/mem_uvc.cpp
 camera_usb_c += $(convert_h)
-camera_usb_c += $(convert_c)
 
 #**********
 
@@ -242,6 +241,7 @@ main_dep += $(sdl_include_h)
 # main_o.cpp
 main_dep += $(alloc_type_c)
 main_dep += $(image_c)
+main_dep += $(convert_c)
 main_dep += $(qsprintf)
 main_dep += $(sdl_input_c)
 main_dep += $(span_c)
