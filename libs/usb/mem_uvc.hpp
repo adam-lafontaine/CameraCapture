@@ -1,5 +1,8 @@
 #pragma once
 
+#ifndef __linux__
+#error Linux only
+#endif
 
 namespace mem_uvc
 {

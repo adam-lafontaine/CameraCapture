@@ -6,9 +6,6 @@
 
 namespace convert
 {
-    enum class YUV : u32 { Y = 0, U = 1, V = 2 };
-
-
     class OffsetYUYV
     {
     public:
@@ -24,6 +21,52 @@ namespace convert
         u8 u;
         u8 v;
     };
+
+
+    constexpr OffsetYUYV offset_yuyv(PixelFormat pf)
+    {
+        using PF = PixelFormat;
+
+        OffsetYUYV yuyv{};
+
+        switch (pf)
+        {
+        case PF::YUYV:
+        case PF::YUNV:
+        case PF::YUY2:            
+            yuyv.y1 = 0;
+            yuyv.u  = 1;
+            yuyv.y2 = 2;
+            yuyv.v  = 3;
+            break;
+        
+        case PF::YVYU:
+            yuyv.y1 = 0;
+            yuyv.v  = 1;
+            yuyv.y2 = 2;
+            yuyv.u  = 3;
+            break;
+        
+        case PF::UYVY:
+        case PF::Y422:
+        case PF::UYNV:
+        case PF::HDYC:
+            yuyv.u  = 0;
+            yuyv.y1 = 1;
+            yuyv.v  = 2;
+            yuyv.y2 = 3;
+            break;
+
+        default:
+            yuyv.y1 = 0;
+            yuyv.y2 = 0;
+            yuyv.u  = 0;
+            yuyv.v  = 0;
+
+        }
+
+        return yuyv;
+    }
     
 
     static void yuyv_to_planar(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
@@ -69,6 +112,56 @@ namespace convert
     }
     
 
+    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<UV> const& src_uv, ViewYUV const& dst)
+    { 
+        auto width = dst.width;
+        auto height = dst.height;
+        auto len = width * height;
+
+        img::copy(src_y, img::select_channel(dst, (u32)YUV::Y));
+
+        auto suv = src_uv.matrix_data_;
+        auto du = dst.channel_data[(u32)YUV::U];
+        auto dv = dst.channel_data[(u32)YUV::V];
+
+        for (u32 h = 0; h < height; h += 2)
+        {
+            auto du1 = du + h * width;
+            auto du2 = du1 + 1;
+            auto du3 = du1 + width;
+            auto du4 = du3 + 1;
+
+            auto dv1 = dv + h * width;
+            auto dv2 = dv1 + 1;
+            auto dv3 = dv1 + width;
+            auto dv4 = dv3 + 1;
+
+            for (u32 w = 0; w < width; w += 2)
+            {  
+                *du1 = *du2 = *du3 = *du4 = suv->u;
+                *dv1 = *dv2 = *dv3 = *dv4 = suv->v;
+                
+                suv++;
+
+                du1 += 2;
+                du2 += 2;
+                du3 += 2;
+                du4 += 2;
+
+                dv1 += 2;
+                dv2 += 2;
+                dv3 += 2;
+                dv4 += 2;
+            }
+        }
+    }
+}
+
+
+/* yuv to planar scaled, not tested */
+
+namespace convert
+{
     static void yuyv_to_planar(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv, u32 scale)
     {
         auto y1 = yuyv.y1;
@@ -132,57 +225,6 @@ namespace convert
 
             srect.y_begin += N;
             srect.y_end += N;
-        }
-    }
-
-
-    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<UV> const& src_uv, ViewYUV const& dst)
-    { 
-        auto width = dst.width;
-        auto height = dst.height;
-        auto len = width * height;
-
-        auto sy = src_y.matrix_data_;
-        auto suv = src_uv.matrix_data_;
-
-        auto dy = dst.channel_data[(int)YUV::Y];
-        auto du = dst.channel_data[(int)YUV::U];
-        auto dv = dst.channel_data[(int)YUV::V];
-
-        for (u32 i = 0; i < len; i++)
-        {
-            dy[i] = (f32)sy[i];
-        }
-
-        for (u32 h = 0; h < height; h += 2)
-        {
-            auto du1 = du + h * width;
-            auto du2 = du1 + 1;
-            auto du3 = du1 + width;
-            auto du4 = du3 + 1;
-
-            auto dv1 = dv + h * width;
-            auto dv2 = dv1 + 1;
-            auto dv3 = dv1 + width;
-            auto dv4 = dv3 + 1;
-
-            for (u32 w = 0; w < width; w += 2)
-            {  
-                *du1 = *du2 = *du3 = *du4 = suv->u;
-                *dv1 = *dv2 = *dv3 = *dv4 = suv->v;
-                
-                suv++;
-
-                du1 += 2;
-                du2 += 2;
-                du3 += 2;
-                du4 += 2;
-
-                dv1 += 2;
-                dv2 += 2;
-                dv3 += 2;
-                dv4 += 2;
-            }
         }
     }
 
@@ -279,144 +321,75 @@ namespace convert
         constexpr f32 vb = 0.0f;
 
         constexpr f32 f = 1.0f / 255.0f;
+    }   
+
+
+    template <typename T>
+    static void yuv_to_rgb(T y, T u, T v, u8* r, u8* g, u8* b)
+    {
+        auto yf = y;
+        auto uf = u - 127.5f;
+        auto vf = v - 127.5f;
+
+        auto rf = (yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf);
+        auto gf = (yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf);
+        auto bf = (yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf);
+
+        *r = num::round_to_unsigned<u8>(num::clamp(rf, 0.0f, 255.0f));
+        *g = num::round_to_unsigned<u8>(num::clamp(gf, 0.0f, 255.0f));
+        *b = num::round_to_unsigned<u8>(num::clamp(bf, 0.0f, 255.0f));
     }
 
 
-    static void yuv_to_rgb(u8* y, u8* u, u8* v, u8* r, u8* g, u8* b, u32 len)
+    template <typename T>
+    static void yuv_to_rgb(T y, T u, T v, img::Pixel* dst)
+    {   
+        auto yf = y;
+        auto uf = u - 127.5f;
+        auto vf = v - 127.5f;
+
+        auto rf = (yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf);
+        auto gf = (yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf);
+        auto bf = (yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf);
+
+        dst->red = num::round_to_unsigned<u8>(num::clamp(rf, 0.0f, 255.0f));
+        dst->green = num::round_to_unsigned<u8>(num::clamp(gf, 0.0f, 255.0f));
+        dst->blue = num::round_to_unsigned<u8>(num::clamp(bf, 0.0f, 255.0f));
+    }
+
+
+    template <typename T>
+    static void yuv_to_rgba(T* y, T* u, T* v, img::Pixel* dst, u32 len)
     {
-        // TODO: simd
+        constexpr auto S = sizeof(img::Pixel);
+
+        auto r = &dst->red;
+        auto g = &dst->green;
+        auto b = &dst->blue;
+        auto a = &dst->alpha;
 
         for (u32 i = 0; i < len; i++)
         {
-            auto yf = y[i] * yuv::f;
-            auto uf = u[i] * yuv::f - 0.5f;
-            auto vf = v[i] * yuv::f - 0.5f;
+            yuv_to_rgb(y[i], u[i], v[i], r, g, b);
+            *a = 255;
 
-            auto rf = num::clamp((yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf), 0.0f, 1.0f) * 255;
-            auto gf = num::clamp((yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf), 0.0f, 1.0f) * 255;
-            auto bf = num::clamp((yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf), 0.0f, 1.0f) * 255;
-
-            r[i] = num::round_to_unsigned<u8>(rf);
-            g[i] = num::round_to_unsigned<u8>(gf);
-            b[i] = num::round_to_unsigned<u8>(bf);
+            r += S;
+            g += S;
+            b += S;
+            a += S;
         }
     }
 
 
-    static void yuv_to_rgb(u8* y, u8* u, u8* v, img::Pixel* p, u32 len)
+    template <typename T>
+    static void yuv_to_rgb(T* y, T* u, T* v, u8* r, u8* g, u8* b, u32 len)
     {
         for (u32 i = 0; i < len; i++)
         {
-            auto yf = y[i] * yuv::f;
-            auto uf = u[i] * yuv::f - 0.5f;
-            auto vf = v[i] * yuv::f - 0.5f;
-
-            auto rf = num::clamp((yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf), 0.0f, 1.0f) * 255;
-            auto gf = num::clamp((yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf), 0.0f, 1.0f) * 255;
-            auto bf = num::clamp((yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf), 0.0f, 1.0f) * 255;
-
-            p[i].red   = num::round_to_unsigned<u8>(rf);
-            p[i].green = num::round_to_unsigned<u8>(gf);
-            p[i].blue  = num::round_to_unsigned<u8>(bf);
-        }
-    }    
-
-
-    static void yuv_to_rgba(u8* y, u8* u, u8* v, img::Pixel* dst, u32 len)
-    {
-        for (u32 i = 0; i < len; i++)
-        {
-            auto yf = y[i] * yuv::f;
-            auto uf = u[i] * yuv::f - 0.5f;
-            auto vf = v[i] * yuv::f - 0.5f;
-
-            auto rf = num::clamp((yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf), 0.0f, 1.0f) * 255;
-            auto gf = num::clamp((yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf), 0.0f, 1.0f) * 255;
-            auto bf = num::clamp((yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf), 0.0f, 1.0f) * 255;
-
-            dst[i].red   = num::round_to_unsigned<u8>(rf);
-            dst[i].green = num::round_to_unsigned<u8>(gf);
-            dst[i].blue  = num::round_to_unsigned<u8>(bf);
-            dst[i].alpha = 255;
-        }
-    }
-    
-    
-    static void yuv_to_rgba(u8 y, u8 u, u8 v, img::Pixel* dst)
-    {
-        auto yf = y * yuv::f;
-        auto uf = u * yuv::f - 0.5f;
-        auto vf = v * yuv::f - 0.5f;
-
-        auto rf = num::clamp((yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf), 0.0f, 1.0f) * 255;
-        auto gf = num::clamp((yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf), 0.0f, 1.0f) * 255;
-        auto bf = num::clamp((yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf), 0.0f, 1.0f) * 255;
-
-        dst->red   = num::round_to_unsigned<u8>(rf);
-        dst->green = num::round_to_unsigned<u8>(gf);
-        dst->blue  = num::round_to_unsigned<u8>(bf);
-        dst->alpha = 255;
-    }
-
-
-    static void yuv_to_rgb(f32* y, f32* u, f32* v, u8* r, u8* g, u8* b, u32 len)
-    {
-        for (u32 i = 0; i < len; i++)
-        {
-            auto yf = y[i];
-            auto uf = u[i] - 127.5f;
-            auto vf = v[i] - 127.5f;
-
-            auto rf = (yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf);
-            auto gf = (yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf);
-            auto bf = (yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf);
-
-            r[i] = num::round_to_unsigned<u8>(num::clamp(rf, 0.0f, 255.0f));
-            g[i] = num::round_to_unsigned<u8>(num::clamp(gf, 0.0f, 255.0f));
-            b[i] = num::round_to_unsigned<u8>(num::clamp(bf, 0.0f, 255.0f));
-        }
-    }
-
-
-    static void yuv_to_rgb(f32* y, f32* u, f32* v, img::Pixel* dst, u32 len)
-    {
-        for (u32 i = 0; i < len; i++)
-        {
-            auto yf = y[i];
-            auto uf = u[i] - 127.5f;
-            auto vf = v[i] - 127.5f;
-
-            auto rf = (yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf);
-            auto gf = (yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf);
-            auto bf = (yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf);
-
-            auto& p = dst[i];
-
-            p.red   = num::round_to_unsigned<u8>(num::clamp(rf, 0.0f, 255.0f));
-            p.green = num::round_to_unsigned<u8>(num::clamp(gf, 0.0f, 255.0f));
-            p.blue  = num::round_to_unsigned<u8>(num::clamp(bf, 0.0f, 255.0f));
-        }
-    }
-
-
-    static void yuv_to_rgba(f32* y, f32* u, f32* v, img::Pixel* dst, u32 len)
-    {
-        for (u32 i = 0; i < len; i++)
-        {
-            auto yf = y[i];
-            auto uf = u[i] - 127.5f;
-            auto vf = v[i] - 127.5f;
-
-            auto rf = (yuv::yr * yf) + (yuv::ur * uf) + (yuv::vr * vf);
-            auto gf = (yuv::yg * yf) + (yuv::ug * uf) + (yuv::vg * vf);
-            auto bf = (yuv::yb * yf) + (yuv::ub * uf) + (yuv::vb * vf);
-
-            auto& p = dst[i];
-
-            p.red   = num::round_to_unsigned<u8>(num::clamp(rf, 0.0f, 255.0f));
-            p.green = num::round_to_unsigned<u8>(num::clamp(gf, 0.0f, 255.0f));
-            p.blue  = num::round_to_unsigned<u8>(num::clamp(bf, 0.0f, 255.0f));
-            p.alpha = 255;
+            yuv_to_rgb(y[i], u[i], v[i], r, g, b);
+            ++r;
+            ++g;
+            ++b;
         }
     }
 }
@@ -424,7 +397,7 @@ namespace convert
 
 namespace convert
 {
-    static void span_yuv4_to_pixel(SpanView<u8> const& src, SpanView<img::Pixel> const& dst, OffsetYUYV yuyv)
+    static void span_yuyv_to_pixel(SpanView<u8> const& src, SpanView<img::Pixel> const& dst, OffsetYUYV yuyv)
     {
         auto const len  = src.length;
 
@@ -440,13 +413,33 @@ namespace convert
 
         for (u32 i = 0; i < len; i += 4)
         {
-            yuv_to_rgba(s[y1], s[u], s[v], d1);
-            yuv_to_rgba(s[y2], s[u], s[v], d2);
+            yuv_to_rgb(s[y1], s[u], s[v], d1);
+            yuv_to_rgb(s[y2], s[u], s[v], d2);
+
+            d1->alpha = 255;
+            d2->alpha = 255;
 
             d1 += 2;
             d2 += 2;
 
             s += 4;
+        }
+    }
+
+
+    static inline void span_yuyv_to_view(SpanView<u8> const& src, img::ImageView const& dst, OffsetYUYV yuyv)
+    {
+        span_yuyv_to_pixel(src, img::to_span(dst), yuyv);
+    }
+
+
+    static inline void span_yuyv_to_sub_view(SpanView<u8> const& src, img::SubView const& dst, OffsetYUYV yuyv)
+    {
+        auto const w = dst.width;
+
+        for (u32 y = 0; y < dst.height; y++)
+        {
+            span_yuyv_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
         }
     }
 
@@ -459,106 +452,26 @@ namespace convert
 
 namespace convert
 {
-    void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
+    void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst, PixelFormat format)
     {
         assert(src.length == dst.width * dst.height * 2);
 
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.u  = 1;
-        yuyv.y2 = 2;
-        yuyv.v  = 3;
-
-        span_yuv4_to_pixel(src, img::to_span(dst), yuyv);
+        auto yuyv = offset_yuyv(format);
+        span_yuyv_to_view(src, dst, yuyv);
     }
 
 
-    void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
+    void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format)
     {
         assert(src.length == dst.width * dst.height * 2);
 
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.u  = 1;
-        yuyv.y2 = 2;
-        yuyv.v  = 3;
-
-        auto const w = dst.width;
-
-        for (u32 y = 0; y < dst.height; y++)
-        {
-            span_yuv4_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
-        }
-    }
-
-
-    void yvyu_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.v  = 1;
-        yuyv.y2 = 2;
-        yuyv.u  = 3;
-
-        span_yuv4_to_pixel(src, img::to_span(dst), yuyv);
-    }
-
-
-    void yvyu_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.v  = 1;
-        yuyv.y2 = 2;
-        yuyv.u  = 3;
-
-        auto const w = dst.width;
-
-        for (u32 y = 0; y < dst.height; y++)
-        {
-            span_yuv4_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
-        }
-    }
-
-
-    void uyvy_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.u  = 0;
-        yuyv.y1 = 1;
-        yuyv.v  = 2;
-        yuyv.y2 = 3;
-
-        span_yuv4_to_pixel(src, img::to_span(dst), yuyv);
-    }
-
-
-    void uyvy_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
-    {
-        assert(src.length == dst.width * dst.height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.u  = 0;
-        yuyv.y1 = 1;
-        yuyv.v  = 2;
-        yuyv.y2 = 3;
-
-        auto const w = dst.width;
-
-        for (u32 y = 0; y < dst.height; y++)
-        {
-            span_yuv4_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
-        }
+        auto yuyv = offset_yuyv(format);
+        span_yuyv_to_sub_view(src, dst, yuyv);
     }
     
-    
-    void nv12_to_rgba(SpanView<u8> const& src, img::ImageView const& dst)
+
+    template <class VIEW>
+    void nv12_to_rgba(SpanView<u8> const& src, VIEW const& dst)
     {
         auto const width = dst.width;
         auto const height = dst.height;
@@ -567,57 +480,7 @@ namespace convert
 
         auto sy = src.begin;
         auto suv = sy + width * height;
-        auto sd = dst.matrix_data_;
-
-        auto u = suv;
-        auto v = u + 1;
-
-        for (u32 h = 0; h < height; h += 2)
-        {
-            auto y1 = sy + h * width;
-            auto y2 = y1 + 1;
-            auto y3 = y1 + width;
-            auto y4 = y3 + 1;
-
-            auto d1 = sd + h * width;
-            auto d2 = d1 + 1;
-            auto d3 = d1 + width;
-            auto d4 = d3 + 1;
-
-            for (u32 w = 0; w < width; w += 2)
-            {  
-                yuv_to_rgba(*y1, *u, *v, d1);
-                yuv_to_rgba(*y2, *u, *v, d2);
-                yuv_to_rgba(*y3, *u, *v, d3);
-                yuv_to_rgba(*y4, *u, *v, d4);
-
-                y1 += 2;
-                y2 += 2;
-                y3 += 2;
-                y4 += 2;
-
-                d1 += 2;
-                d2 += 2;
-                d3 += 2;
-                d4 += 2;
-
-                u += 2;
-                v += 2;
-            }
-        }
-    }
-
-
-    void nv12_to_rgba(SpanView<u8> const& src, img::SubView const& dst)
-    {
-        auto const width = dst.width;
-        auto const height = dst.height;
-
-        assert(src.length == width * height + width * height / 2);
-
-        auto sy = src.begin;
-        auto suv = sy + width * height;
-        auto sd = img::row_span(dst, 0).begin;
+        auto sd = img::row_begin(dst, 0);
 
         auto u = suv;
         auto v = u + 1;        
@@ -629,17 +492,22 @@ namespace convert
             auto y3 = y1 + width;
             auto y4 = y3 + 1;
 
-            auto d1 = img::row_span(dst, h).begin;
+            auto d1 = img::row_begin(dst, h);
             auto d2 = d1 + 1;
-            auto d3 = img::row_span(dst, h + 1).begin;
+            auto d3 = img::row_begin(dst, h + 1);
             auto d4 = d3 + 1;
 
             for (u32 w = 0; w < width; w += 2)
             {  
-                yuv_to_rgba(*y1, *u, *v, d1);
-                yuv_to_rgba(*y2, *u, *v, d2);
-                yuv_to_rgba(*y3, *u, *v, d3);
-                yuv_to_rgba(*y4, *u, *v, d4);
+                yuv_to_rgb(*y1, *u, *v, d1);
+                yuv_to_rgb(*y2, *u, *v, d2);
+                yuv_to_rgb(*y3, *u, *v, d3);
+                yuv_to_rgb(*y4, *u, *v, d4);
+
+                d1->alpha = 255;
+                d2->alpha = 255;
+                d3->alpha = 255;
+                d4->alpha = 255;
 
                 y1 += 2;
                 y2 += 2;
@@ -720,46 +588,13 @@ namespace convert
             break;
         }
     }
-    
-    
-    static void yuyv_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
+
+
+    static void yuyv_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format)
     {
         assert(src.length == width * height * 2);
 
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.u  = 1;
-        yuyv.y2 = 2;
-        yuyv.v  = 3;
-
-        yuyv_to_planar_scale(src, width, height, dst, yuyv);
-    }
-
-
-    static void yvyu_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
-    {
-        assert(src.length == width * height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.y1 = 0;
-        yuyv.v  = 1;
-        yuyv.y2 = 2;
-        yuyv.u  = 3;
-
-        yuyv_to_planar_scale(src, width, height, dst, yuyv);
-    }
-
-
-    static void uyvy_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
-    {
-        assert(src.length == width * height * 2);
-
-        OffsetYUYV yuyv{};
-        yuyv.u  = 0;
-        yuyv.y1 = 1;
-        yuyv.v  = 2;
-        yuyv.y2 = 3;
-
+        auto yuyv = offset_yuyv(format);
         yuyv_to_planar_scale(src, width, height, dst, yuyv);
     }
 
@@ -818,18 +653,12 @@ namespace convert
         case PF::YUYV:
         case PF::YUNV:
         case PF::YUY2:
-            yuyv_to_rgba(src, dst);
-            break;
-        
         case PF::YVYU:
-            yvyu_to_rgba(src, dst);
-            break;
-        
         case PF::UYVY:
         case PF::Y422:
         case PF::UYNV:
         case PF::HDYC:
-            uyvy_to_rgba(src, dst);
+            yuyv_to_rgba(src, dst, format);
             break;
 
         case PF::NV12:
@@ -851,18 +680,12 @@ namespace convert
         case PF::YUYV:
         case PF::YUNV:
         case PF::YUY2:
-            yuyv_to_rgba(src, dst);
-            break;
-        
         case PF::YVYU:
-            yvyu_to_rgba(src, dst);
-            break;
-        
         case PF::UYVY:
         case PF::Y422:
         case PF::UYNV:
         case PF::HDYC:
-            uyvy_to_rgba(src, dst);
+            yuyv_to_rgba(src, dst, format);
             break;
 
         case PF::NV12:
@@ -872,23 +695,6 @@ namespace convert
         default:
             img::fill(dst, img::to_pixel(100));
         }
-    }
-    
-
-    ViewYUV make_view_yuv(u32 width, u32 height, img::Buffer32& buffer)
-    {
-        auto len = width * height;
-
-        ViewYUV view{};
-
-        view.width = width;
-        view.height = height;
-
-        view.channel_data[0] = (f32*)mb::push_elements(buffer, len);
-        view.channel_data[1] = (f32*)mb::push_elements(buffer, len);
-        view.channel_data[2] = (f32*)mb::push_elements(buffer, len);
-
-        return view; 
     }
 
 
@@ -900,27 +706,17 @@ namespace convert
         {
         case PF::YUYV:
         case PF::YUNV:
-        case PF::YUY2:            
-            yuyv_to_yuv(src, width, height, dst);
-            break;
-        
+        case PF::YUY2:
         case PF::YVYU:
-            yvyu_to_yuv(src, width, height, dst);
-            break;
-        
         case PF::UYVY:
         case PF::Y422:
         case PF::UYNV:
         case PF::HDYC:
-            uyvy_to_yuv(src, width, height, dst);
+            yuyv_to_yuv(src, width, height, dst, format);
             break;
 
         case PF::NV12:
             nv12_to_yuv(src, width, height, dst);
-            break;
-
-        default:
-            //img::fill(dst, img::to_pixel(100));
             break;
         }
     }
@@ -963,6 +759,25 @@ namespace convert
             u += len;
             v += len;
         }
+    }
+
+
+    void yuv_to_rgb(ViewYUV const& src, img::ViewRGBu8 const& dst)
+    {
+        assert(src.width == dst.width);
+        assert(src.height == dst.height);
+
+        auto len = src.width * src.height;
+
+        auto y = src.channel_data[(u32)YUV::Y];
+        auto u = src.channel_data[(u32)YUV::U];
+        auto v = src.channel_data[(u32)YUV::V];
+
+        auto r = dst.channel_data[(u32)img::RGB::R];
+        auto g = dst.channel_data[(u32)img::RGB::G];
+        auto b = dst.channel_data[(u32)img::RGB::B];
+
+        yuv_to_rgb(y, u, v, r, g, b, len);
     }
 }
 

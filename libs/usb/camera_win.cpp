@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef _WIN32
+#error Windows only
+#endif
+
 #include "camera_usb.hpp"
 #include "../image/convert.hpp"
 #include "../util/numeric.hpp"
@@ -319,7 +323,7 @@ namespace camera_usb
         f32 grab_ms;
 
         img::ImageView rgba;
-        convert::ViewYUV yuv;
+        img::View3u8 view3;
     };
 
 
@@ -333,6 +337,7 @@ namespace camera_usb
         u32 count = 0;
 
         img::Buffer32 data32;
+        img::Buffer8 data8;
     };
 }
 
@@ -368,7 +373,7 @@ namespace camera_usb
     }
 
 
-    static bool grab_and_convert_frame_rgba(DeviceW32& device)
+    static bool grab_and_convert_frame_rgba(DeviceW32& device, img::ImageView const& dst)
     {
         auto result = w32::read_frame(device.p_reader, device.p_sample);
         if (!result.success)
@@ -383,8 +388,57 @@ namespace camera_usb
         auto w = device.format.width;
         auto h = device.format.height;
 
-        cvt::to_yuv(span, w, h, device.yuv, format);
-        cvt::yuv_to_rgba(device.yuv, device.rgba);
+        cvt::to_yuv(span, w, h, device.view3, format);
+        cvt::yuv_to_rgba(device.view3, dst);
+
+        w32::release(frame);
+        w32::release(device.p_sample);
+
+        return true;
+    }
+
+
+    static bool grab_and_convert_frame_rgb(DeviceW32& device, img::View3u8 const& dst)
+    {
+        auto result = w32::read_frame(device.p_reader, device.p_sample);
+        if (!result.success)
+        {
+            return false;
+        }
+
+        auto& frame = result.data;
+        auto span = span::make_view((u8*)frame.data, frame.size_bytes);
+
+        auto format = device.format.pixel_format;
+        auto w = device.format.width;
+        auto h = device.format.height;
+
+        cvt::to_yuv(span, w, h, device.view3, format);
+        cvt::yuv_to_rgb(device.view3, dst);
+
+        w32::release(frame);
+        w32::release(device.p_sample);
+
+        return true;
+    }
+
+
+    static bool grab_and_convert_frame_yuv(DeviceW32& device, img::View3u8 const& dst)
+    {
+        auto result = w32::read_frame(device.p_reader, device.p_sample);
+        if (!result.success)
+        {
+            return false;
+        }
+
+        auto& frame = result.data;
+        auto span = span::make_view((u8*)frame.data, frame.size_bytes);
+
+        auto format = device.format.pixel_format;
+        auto w = device.format.width;
+        auto h = device.format.height;
+
+        cvt::to_yuv(span, w, h, dst, format);
 
         w32::release(frame);
         w32::release(device.p_sample);
@@ -522,9 +576,19 @@ namespace camera_usb
             return cameras;
         }
 
+        w32_list.data8 = img::create_buffer8(3 * n_pixels, "w32 data8");
+        if (!w32_list.data8.ok)
+        {
+            mb::destroy_buffer(w32_list.data32);
+            cameras.count = 0;
+            cameras.status = ConnectionStatus::Disconnected;
+            return cameras;
+        }
+
         if (!enumerate_devices(w32_list))
         {
             mb::destroy_buffer(w32_list.data32);
+            mb::destroy_buffer(w32_list.data8);
             cameras.count = 0;
             cameras.status = ConnectionStatus::Disconnected;
             return cameras;
@@ -557,6 +621,7 @@ namespace camera_usb
     void close(CameraList& cameras)
     {
         mb::destroy_buffer(w32_list.data32);
+        mb::destroy_buffer(w32_list.data8);
         close_devices(w32_list);
 
         for (u32 i = 0; i < cameras.count; i++)
@@ -587,14 +652,16 @@ namespace camera_usb
         camera.format = span::to_string_view(format.format_code);
 
         // only one at a time
-        auto& buffer = w32_list.data32;
+        auto& buffer32 = w32_list.data32;
+        auto& buffer8 = w32_list.data8;
         auto w = camera.frame_width;
         auto h = camera.frame_height;
-        mb::reset_buffer(buffer);
-        device.rgba = img::make_view(w, h, buffer);
-        device.yuv = convert::make_view_yuv(w, h, buffer);
+        mb::reset_buffer(buffer32);
+        mb::reset_buffer(buffer8);
+        device.rgba = img::make_view(w, h, buffer32);
+        device.view3 = convert::make_view_yuv(w, h, buffer8);
 
-        if (!buffer.ok)
+        if (!buffer32.ok || !buffer8.ok)
         {
             camera.busy = 0;
             return false;
@@ -614,9 +681,9 @@ namespace camera_usb
         
         device.grab_sw.start();
 
-        if (grab_and_convert_frame_rgba(device))
+        if (!grab_and_convert_frame_rgba(device, dst))
         {
-            img::copy(device.rgba, dst);
+            img::fill(dst, img::to_pixel(0, 0, 255));
         }
 
         device.grab_ms = device.grab_sw.get_time_milli();
@@ -626,8 +693,9 @@ namespace camera_usb
     }
 
 
-    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition)
+    void stream_camera(Camera& camera, img::ImageView const& dst, bool_fn const& stream_condition)
     {
+        camera.busy = 1;
         auto& device = w32_list.devices[camera.id];
 
         auto c_status = camera.status;
@@ -637,17 +705,132 @@ namespace camera_usb
         while (stream_condition())
         {
             device.grab_sw.start();
-            if (grab_and_convert_frame_rgba(device))
+            if (!grab_and_convert_frame_rgba(device, dst))
             {
-                on_grab(device.rgba);
+                img::fill(dst, img::to_pixel(0, 0, 255));
             }
+
             device.grab_ms = device.grab_sw.get_time_milli();
             camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
         }
 
+        camera.busy = 0;
+        camera.status = c_status;
+    }
+
+
+    void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition)
+    {
+        camera.busy = 1;
+        auto& device = w32_list.devices[camera.id];
+
+        auto c_status = camera.status;
+
+        camera.status = CameraStatus::Streaming;
+
+        while (stream_condition())
+        {
+            device.grab_sw.start();
+            if (grab_and_convert_frame_rgba(device, device.rgba))
+            {
+                on_grab(device.rgba);
+            }
+
+            device.grab_ms = device.grab_sw.get_time_milli();
+            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+        }
+
+        camera.busy = 0;
+        camera.status = c_status;
+    }
+
+
+    void grab_planar_rgb(Camera& camera, img::View3u8 const& dst)
+    {
+        camera.busy = 1;
+        auto& device = w32_list.devices[camera.id];
+        
+        device.grab_sw.start();
+
+        if (!grab_and_convert_frame_rgb(device, dst))
+        {
+            
+        }
+
+        device.grab_ms = device.grab_sw.get_time_milli();
+        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+
+        camera.busy = 0;
+    }
+
+
+    void grab_planar_yuv(Camera& camera, img::View3u8 const& dst)
+    {
+        camera.busy = 1;
+        auto& device = w32_list.devices[camera.id];
+        
+        device.grab_sw.start();
+
+        if (!grab_and_convert_frame_yuv(device, dst))
+        {
+            
+        }
+
+        device.grab_ms = device.grab_sw.get_time_milli();
+        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+
+        camera.busy = 0;
+    }
+
+
+    void stream_planar_rgb(Camera& camera, planar_cb const& proc, bool_fn const& stream_condition)
+    {
+        camera.busy = 1;
+        auto& device = w32_list.devices[camera.id];
+
+        auto c_status = camera.status;
+
+        camera.status = CameraStatus::Streaming;
+
+        while (stream_condition())
+        {
+            device.grab_sw.start();
+            if (grab_and_convert_frame_rgb(device, device.view3))
+            {
+                proc(device.view3);
+            }
+
+            device.grab_ms = device.grab_sw.get_time_milli();
+            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+        }
+
+        camera.busy = 0;
+        camera.status = c_status;
+    }
+
+
+    void stream_planar_yuv(Camera& camera, planar_cb const& proc, bool_fn const& stream_condition)
+    {
+        camera.busy = 1;
+        auto& device = w32_list.devices[camera.id];
+
+        auto c_status = camera.status;
+
+        camera.status = CameraStatus::Streaming;
+
+        while (stream_condition())
+        {
+            device.grab_sw.start();
+            if (grab_and_convert_frame_yuv(device, device.view3))
+            {
+                proc(device.view3);
+            }
+
+            device.grab_ms = device.grab_sw.get_time_milli();
+            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+        }
+
+        camera.busy = 0;
         camera.status = c_status;
     }
 }
-
-
-#include "../image/convert.cpp"

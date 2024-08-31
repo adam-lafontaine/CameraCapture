@@ -197,7 +197,6 @@ convert_c := $(image)/convert.cpp
 camera_usb_c := $(usb)/camera_win.cpp
 camera_usb_c += $(camera_usb_h)
 camera_usb_c += $(convert_h)
-camera_usb_c += $(convert_c)
 
 #**********
 
@@ -250,23 +249,27 @@ main_c := $(pltfm)/camera_main_win32.cpp
 main_o := $(build)/main.o
 obj    := $(main_o)
 
-
 main_dep := $(imgui_include_h)
+main_dep += $(input_display_h)
+main_dep += $(diagnostics_h)
+main_dep += $(camera_display_h)
 main_dep += $(sdl_include_h)
-main_dep += $(stopwatch_h)
+
+# main_o.cpp
 main_dep += $(alloc_type_c)
 main_dep += $(image_c)
+main_dep += $(convert_c)
 main_dep += $(qsprintf)
+main_dep += $(sdl_input_c)
 main_dep += $(span_c)
 main_dep += $(stb_image_options_h)
-main_dep += $(sdl_input_c)
-main_dep += $(camera_usb_c)
-main_dep += $(camera_display_h)
 main_dep += $(camera_display_c)
-main_dep += $(diagnostics_h)
-main_dep += $(diagnostics_c)
-main_dep += $(input_display_h)
 main_dep += $(input_display_c)
+main_dep += $(diagnostics_c)
+
+main_dep += $(camera_usb_c)
+
+# force recompile
 main_dep += $(res_image_cpp)
 
 #****************

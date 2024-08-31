@@ -4,6 +4,7 @@
 
 
 namespace cam = camera_usb;
+namespace img = image;
 
 
 namespace camera_display
@@ -13,13 +14,14 @@ namespace camera_display
     public:
 
         img::ImageView display;
+        f32 histogram[64] = { 0 };
 
-        cam::CameraList cameras;        
-
-        bool is_connected() const { return cameras.status == cam::ConnectionStatus::Connected; }
+        cam::CameraList cameras; 
 
         bool is_streaming = false;
 
+
+        static constexpr auto hist_count = sizeof(histogram) / sizeof(histogram[0]);
     };
 
 

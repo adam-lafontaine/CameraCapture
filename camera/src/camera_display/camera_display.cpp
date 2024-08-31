@@ -2,6 +2,7 @@
 
 #include "camera_display.hpp"
 #include "../../../libs/imgui/imgui.h"
+#include "../../../libs/image/convert.hpp"
 
 #include <thread>
 #include <array>
@@ -248,14 +249,33 @@ namespace camera_display
     }
 
 
+    static void update_histogram(img::View3u8 const& yuv, CameraState& state)
+    {
+        auto src = convert::select_y(yuv);
+
+        constexpr auto BINS = CameraState::hist_count;
+        constexpr auto F = 256 / BINS;
+
+        auto n_pixels = (f32)(src.width * src.height);
+
+        u32 bin_totals[BINS] = { 0 };
+
+        img::for_each_pixel(src, [&](u8 p)
+        {
+            auto bin = p / F;
+            bin_totals[bin]++;
+        });
+
+        for (u32 i = 0; i < BINS; i++)
+        {
+            state.histogram[i] = bin_totals[i] / n_pixels;
+        }
+    }
+
+
     static void stream_camera(CameraState& state, cam::Camera& camera)
     {
         auto const is_on = [&](){ return state.is_streaming; };
-
-        auto const on_grab = [&](img::ImageView const& frame)
-        { 
-            img::copy(frame, state.display);
-        };
 
         state.is_streaming = true;
 
@@ -264,8 +284,14 @@ namespace camera_display
             auto& c = state.cameras.list[i];
             c.busy = 1;
         }
+
+        auto const proc = [&](img::View3u8 const& yuv)
+        {
+            convert::yuv_to_rgba(yuv, state.display);
+            update_histogram(yuv, state);
+        };
         
-        cam::stream_camera(camera, on_grab, is_on);
+        cam::stream_planar_yuv(camera, proc, is_on);
     }
 
 
@@ -311,6 +337,18 @@ namespace camera_display
             stream_camera_async(state, camera);
         }
     }
+
+
+    static void plot_histogram(CameraState const& state)
+    {
+        auto max = 0.0f;
+        for (u32 i = 0; i < state.hist_count; i++)
+        {
+            max = num::max(max, state.histogram[i]);
+        }
+
+        ImGui::PlotHistogram("Histogram", state.histogram, state.hist_count, 0, NULL, 0.0f, max, ImVec2(0, 80.0f));
+    }
 }
 
 
@@ -348,6 +386,8 @@ namespace camera_display
         {
             toggle_stream_async(state, state.cameras.list[cmd.camera_id]);
         }
+
+        plot_histogram(state);
         
     }
 }

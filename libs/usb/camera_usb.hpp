@@ -2,8 +2,6 @@
 
 #include "../image/image.hpp"
 
-namespace img = image;
-
 
 /* constants */
 
@@ -11,6 +9,8 @@ namespace camera_usb
 {
     constexpr u32 WIDTH_MAX = 640;
     constexpr u32 HEIGHT_MAX = 480;
+
+    namespace img = image;
 }
 
 
@@ -74,7 +74,8 @@ namespace camera_usb
 
 
     using bool_fn = std::function<bool()>;
-    using grab_cb = std::function<void(image::ImageView const&)>;
+    using grab_cb = std::function<void(img::ImageView const&)>;
+    using planar_cb = std::function<void(img::View3u8 const&)>;
 
 
     CameraList enumerate_cameras();
@@ -84,6 +85,19 @@ namespace camera_usb
     bool open_camera(Camera& camera);
 
     void grab_image(Camera& camera, img::ImageView const& dst);
+    
+
+    void stream_camera(Camera& camera, img::ImageView const& dst, bool_fn const& stream_condition);
 
     void stream_camera(Camera& camera, grab_cb const& on_grab, bool_fn const& stream_condition);
+
+
+    void grab_planar_rgb(Camera& camera, img::View3u8 const& dst);
+
+    void grab_planar_yuv(Camera& camera, img::View3u8 const& dst);
+
+    
+    void stream_planar_rgb(Camera& camera, planar_cb const& proc, bool_fn const& stream_condition);
+
+    void stream_planar_yuv(Camera& camera, planar_cb const& proc, bool_fn const& stream_condition);
 }

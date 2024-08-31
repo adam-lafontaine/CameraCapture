@@ -257,7 +257,7 @@ namespace dx11
     class Texture
     {
     public:
-        ID3D11Texture2D *pTexture = 0;
+        ID3D11Texture2D* pTexture = 0;
         ID3D11ShaderResourceView* srv;
         TextureId id;
 
@@ -275,6 +275,8 @@ namespace dx11
         Texture data[count] = { 0 };
 
         Texture& get(TextureId id) { return data[id.value]; }
+
+        void* get_imgui_texture(TextureId id) { return (void*)get(id).srv; }
     };
 
 
@@ -345,11 +347,5 @@ namespace dx11
             0);
 
         ctx.pd3dDeviceContext->PSSetShaderResources(0, 1, &texture.srv);
-    }
-
-
-    static inline void display_texture(Texture const& texture, ImVec2 const& size)
-    {
-        ImGui::Image((void*)texture.srv, size);
     }
 }

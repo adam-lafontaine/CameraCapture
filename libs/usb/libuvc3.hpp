@@ -1,6 +1,10 @@
 #ifndef LIBUVC_H
 #define LIBUVC_H
 
+#ifndef __linux__
+#error Linux only
+#endif
+
 //#define LIBUVC_IMPLEMENTATION
 
 //#define LIBUVC_HAS_JPEG 1
