@@ -10,3 +10,4 @@
 #include "../../diagnostics/diagnostics.cpp"
 
 #include "../../../../libs/usb/camera_uvc.cpp"
+#include "../../../../libs/image/convert.cpp"

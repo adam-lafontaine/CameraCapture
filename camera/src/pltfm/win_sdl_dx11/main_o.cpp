@@ -1,5 +1,6 @@
 #include "../../../../libs/alloc_type/alloc_type.cpp"
 #include "../../../../libs/image/image.cpp"
+#include "../../../../libs/image/convert.cpp"
 #include "../../../../libs/qsprintf/qsprintf.cpp"
 #include "../../../../libs/sdl/sdl_input.cpp"
 #include "../../../../libs/span/span.cpp"

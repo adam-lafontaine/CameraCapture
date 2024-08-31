@@ -820,6 +820,3 @@ namespace camera_usb
         camera.status = c_status;
     }
 }
-
-
-#include "../image/convert.cpp"

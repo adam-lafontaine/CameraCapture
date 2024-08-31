@@ -809,8 +809,6 @@ namespace camera_usb
     }
 }
 
-#include "../image/convert.cpp"
-
 #define LIBUVC_IMPLEMENTATION
 #define LIBUVC_NUM_TRANSFER_BUFS 50
 #define LIBUVC_TRACK_MEMORY
