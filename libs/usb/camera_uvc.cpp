@@ -591,6 +591,7 @@ namespace camera_usb
     void close(CameraList& cameras)
     {
         mb::destroy_buffer(uvc_list.data32);
+        mb::destroy_buffer(uvc_list.data8);
         close_devices(uvc_list);
 
         for (u32 i = 0; i < cameras.count; i++)
