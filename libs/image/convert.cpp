@@ -16,8 +16,9 @@ namespace convert
     };
 
 
-    struct UV
+    class OffsetUV
     {
+    public:
         u8 u;
         u8 v;
     };
@@ -67,6 +68,27 @@ namespace convert
 
         return yuyv;
     }
+
+
+    constexpr OffsetUV offset_uv(PixelFormat pf)
+    {
+        using PF = PixelFormat;
+
+        OffsetUV uv{};
+
+        switch (pf)
+        {
+        case PF::NV12:
+            uv.u = 0;
+            uv.v = 1;
+        
+        default:
+            uv.u = 0;
+            uv.v = 0;
+        }
+
+        return uv;
+    }
     
 
     static void yuyv_to_planar(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
@@ -112,7 +134,7 @@ namespace convert
     }
     
 
-    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<UV> const& src_uv, ViewYUV const& dst)
+    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<u16> const& src_uv, ViewYUV const& dst, OffsetUV uv)
     { 
         auto width = dst.width;
         auto height = dst.height;
@@ -120,9 +142,12 @@ namespace convert
 
         img::copy(src_y, img::select_channel(dst, (u32)YUV::Y));
 
-        auto suv = src_uv.matrix_data_;
+        auto suv = (u8*)src_uv.matrix_data_;
         auto du = dst.channel_data[(u32)YUV::U];
         auto dv = dst.channel_data[(u32)YUV::V];
+
+        auto u = uv.u;
+        auto v = uv.v;
 
         for (u32 h = 0; h < height; h += 2)
         {
@@ -138,10 +163,10 @@ namespace convert
 
             for (u32 w = 0; w < width; w += 2)
             {  
-                *du1 = *du2 = *du3 = *du4 = suv->u;
-                *dv1 = *dv2 = *dv3 = *dv4 = suv->v;
+                *du1 = *du2 = *du3 = *du4 = suv[u];
+                *dv1 = *dv2 = *dv3 = *dv4 = suv[v];
                 
-                suv++;
+                suv += 2;
 
                 du1 += 2;
                 du2 += 2;
@@ -229,7 +254,7 @@ namespace convert
     }
 
 
-    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<UV> const& src_uv, ViewYUV const& dst, u32 scale)
+    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<u16> const& src_uv, ViewYUV const& dst, OffsetUV uv, u32 scale)
     {
         assert(scale == src_y.height / dst.height);
 
@@ -285,18 +310,21 @@ namespace convert
             srect_y.y_end += N;
         }
 
-        auto suv = src_uv.matrix_data_;
+        auto suv = (u8*)src_uv.matrix_data_;
 
         auto du = dst.channel_data[(u32)YUV::U];
         auto dv = dst.channel_data[(u32)YUV::V];
+
+        auto u = uv.u;
+        auto v = uv.v;
 
         auto len = dw * dh;
 
         for (u32 i = 0; i < len; i++)
         {
-            auto uv = suv[i];
-            du[i] = uv.u;
-            dv[i] = uv.v;
+            du[i] = suv[u];
+            dv[i] = suv[v];
+            suv += 2;
         }
     }
 }
@@ -558,30 +586,30 @@ namespace convert
     }
 
 
-    static void nv12_to_planar_scale(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
+    static void nv12_to_planar_scale(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, OffsetUV uv)
     {
         img::View1u8 src_y{};
         src_y.width = width;
         src_y.height = height;
         src_y.matrix_data_ = src.begin;
 
-        img::View1<UV> src_uv{};
+        img::View1<u16> src_uv{};
         src_uv.width = width / 2;
         src_uv.height = height / 2;
-        src_uv.matrix_data_ = (UV*)(src.begin + width * height);
+        src_uv.matrix_data_ = (u16*)(src.begin + width * height);
 
         auto scale = height / dst.height;
 
         switch (scale)
         {
         case 1:
-            nv12_to_planar(src_y, src_uv, dst);
+            nv12_to_planar(src_y, src_uv, dst, uv);
             break;
 
         case 2:
         case 4:
         case 8:
-            nv12_to_planar(src_y, src_uv, dst, scale);
+            nv12_to_planar(src_y, src_uv, dst, uv, scale);
             break;
 
         default:
@@ -599,12 +627,13 @@ namespace convert
     }
 
 
-    static void nv12_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst)
+    static void nv12_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format)
     { 
         //                  |--- nv12 y ---| |------- nv12 uv ------|
         assert(src.length == width * height + 2 * width * height / 4);
 
-        nv12_to_planar_scale(src, width, height, dst);
+        auto uv = offset_uv(format);
+        nv12_to_planar_scale(src, width, height, dst, uv);
     }
 }
 
@@ -716,7 +745,9 @@ namespace convert
             break;
 
         case PF::NV12:
-            nv12_to_yuv(src, width, height, dst);
+        case PF::NV21:
+        case PF::P010:
+            nv12_to_yuv(src, width, height, dst, format);
             break;
         }
     }

@@ -45,6 +45,7 @@ namespace convert
         HDYC = fcc_to_u32("HDYC"),
         NV11 = fcc_to_u32("NV11"),
         NV12 = fcc_to_u32("NV12"),
+        NV21 = fcc_to_u32("NV21"),
         YV12 = fcc_to_u32("YV12"),
         I420 = fcc_to_u32("I420"),
         IYUV = fcc_to_u32("IYUV"),
