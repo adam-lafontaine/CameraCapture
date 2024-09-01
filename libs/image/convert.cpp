@@ -100,10 +100,10 @@ namespace convert
 
         auto s = (u8*)src.matrix_data_;
 
-        auto y1 = yuyv.y1;
-        auto y2 = yuyv.y2;
-        auto u = yuyv.u;
-        auto v = yuyv.v;
+        auto sy1 = s + yuyv.y1;
+        auto sy2 = s + yuyv.y2;
+        auto su = s + yuyv.u;
+        auto sv = s + yuyv.v;
 
         auto dy1 = dst.channel_data[(int)YUV::Y];
         auto du1 = dst.channel_data[(int)YUV::U];
@@ -115,11 +115,16 @@ namespace convert
 
         for (u32 i = 0; i < len; i += 4)
         {
-            *dy1 = s[y1];            
-            *dy2 = s[y2];
+            *dy1 = *sy1;            
+            *dy2 = *sy2;
 
-            *du1 = *du2 = s[u];
-            *dv1 = *dv2 = s[v];
+            *du1 = *du2 = *su;
+            *dv1 = *dv2 = *sv;
+
+            sy1 += 4;
+            sy2 += 4;
+            su += 4;
+            sv += 4;
 
             dy1 += 2;
             du1 += 2;
@@ -128,8 +133,6 @@ namespace convert
             dy2 += 2;
             du2 += 2;
             dv2 += 2;
-
-            s += 4;
         }
     }
     
@@ -143,11 +146,11 @@ namespace convert
         img::copy(src_y, img::select_channel(dst, (u32)YUV::Y));
 
         auto suv = (u8*)src_uv.matrix_data_;
+        auto su = suv + uv.u;
+        auto sv = suv + uv.v;
+
         auto du = dst.channel_data[(u32)YUV::U];
         auto dv = dst.channel_data[(u32)YUV::V];
-
-        auto u = uv.u;
-        auto v = uv.v;
 
         for (u32 h = 0; h < height; h += 2)
         {
@@ -163,10 +166,11 @@ namespace convert
 
             for (u32 w = 0; w < width; w += 2)
             {  
-                *du1 = *du2 = *du3 = *du4 = suv[u];
-                *dv1 = *dv2 = *dv3 = *dv4 = suv[v];
+                *du1 = *du2 = *du3 = *du4 = *su;
+                *dv1 = *dv2 = *dv3 = *dv4 = *sv;
                 
-                suv += 2;
+                su += 2;
+                sv += 2;
 
                 du1 += 2;
                 du2 += 2;
@@ -352,7 +356,7 @@ namespace convert
     
 
     template <class VIEW>
-    void nv12_to_rgba(SpanView<u8> const& src, VIEW const& dst)
+    void nv12_to_rgba(SpanView<u8> const& src, VIEW const& dst, PixelFormat format)
     {
         auto const width = dst.width;
         auto const height = dst.height;
@@ -363,8 +367,10 @@ namespace convert
         auto suv = sy + width * height;
         auto sd = img::row_begin(dst, 0);
 
-        auto u = suv;
-        auto v = u + 1;        
+        auto uv = offset_uv(format);
+
+        auto u = suv + uv.u;
+        auto v = suv + uv.v;        
 
         for (u32 h = 0; h < height; h += 2)
         {
@@ -473,6 +479,8 @@ namespace convert
             break;
         
         case PF::NV12:
+        case PF::NV21:
+        case PF::P010:
             is_valid = src_len == width * height + width * height / 2;
             break;
 
@@ -502,7 +510,9 @@ namespace convert
             break;
 
         case PF::NV12:
-            nv12_to_rgba(src, dst);
+        case PF::NV21:
+        case PF::P010:
+            nv12_to_rgba(src, dst, format);
             break;
 
         default:
@@ -529,7 +539,9 @@ namespace convert
             break;
 
         case PF::NV12:
-            nv12_to_rgba(src, dst);
+        case PF::NV21:
+        case PF::P010:
+            nv12_to_rgba(src, dst, format);
             break;
 
         default:
