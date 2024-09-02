@@ -98,72 +98,58 @@ namespace convert
     }
     
 
-    static void yuyv_to_planar(SpanView<u8> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
+    static void yuyv_to_planar_1_1(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
     {
-        assert(src.length == dst.width * dst.height * 2);
+        assert(src.width == dst.width / 2);
+        assert(src.height == dst.height);
 
-        auto const len = src.length;
-
-        auto s = src.begin;
+        auto s = (u8*)src.matrix_data_;
 
         auto sy1 = s + yuyv.y1;
         auto sy2 = s + yuyv.y2;
         auto su = s + yuyv.u;
         auto sv = s + yuyv.v;
 
-        auto dy1 = dst.channel_data[(int)YUV::Y];
-        auto du1 = dst.channel_data[(int)YUV::U];
-        auto dv1 = dst.channel_data[(int)YUV::V];
+        auto dy = dst.channel_data[(int)YUV::Y];
+        auto du = dst.channel_data[(int)YUV::U];
+        auto dv = dst.channel_data[(int)YUV::V];
 
-        auto dy2 = dy1 + 1;
-        auto du2 = du1 + 1;
-        auto dv2 = dv1 + 1;
+        auto len = src.width * src.height;
 
-        for (u32 i = 0; i < len; i += 4)
+        for (u32 i = 0; i < len; i++)
         {
-            *dy1 = *sy1;            
-            *dy2 = *sy2;
+            auto si = 4 * i;
+            auto di = 2 * i;
 
-            *du1 = *du2 = *su;
-            *dv1 = *dv2 = *sv;
+            dy[di] = sy1[si];
+            dy[di + 1] = sy2[si];
 
-            sy1 += 4;
-            sy2 += 4;
-            su += 4;
-            sv += 4;
-
-            dy1 += 2;
-            du1 += 2;
-            dv1 += 2;
-
-            dy2 += 2;
-            du2 += 2;
-            dv2 += 2;
+            du[di] = du[di + 1] = su[si];
+            dv[di] = dv[di + 1] = sv[si];
         }
     }
 
 
-    static void yuyv_to_planar_scale2(SpanView<u8> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
+    static void yuyv_to_planar_2_1(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
     {
-        auto w2 = dst.width * 2;
-        auto h2 = dst.height * 2;
+        assert(src.width == dst.width);
+        assert(src.height == 2 * dst.height);
 
-        assert(src.length == w2 * h2 * 2);
+        auto src_pitch = src.width * sizeof(u32);
+        auto p2 = 2 * src_pitch;
 
-        auto w4 = 2 * w2;
-
-        auto s = src.begin;
+        auto s = (u8*)src.matrix_data_;
 
         auto sy1 = s + yuyv.y1;
         auto sy2 = s + yuyv.y2;
-        auto sy3 = sy1 + w2;
-        auto sy4 = sy2 + w2;
+        auto sy3 = sy1 + src_pitch;
+        auto sy4 = sy2 + src_pitch;
 
         auto su1 = s + yuyv.u;
-        auto su2 = su1 + w2;
+        auto su2 = su1 + src_pitch;
 
         auto sv1 = s + yuyv.v;
-        auto sv2 = sv1 + w2;
+        auto sv2 = sv1 + src_pitch;
 
         auto dy = dst.channel_data[(int)YUV::Y];
         auto du = dst.channel_data[(int)YUV::U];
@@ -174,9 +160,10 @@ namespace convert
         {
             for (u32 w = 0; w < dst.width; w++)
             {
-                auto y = ((u32)sy1[w] + sy2[w] + sy3[w] + sy4[w]) / 4;
-                auto u = ((u32)su1[w] + su2[w]) / 2;
-                auto v = ((u32)sv1[w] + sv2[w]) / 2;
+                auto sw = 4 * w;
+                auto y = ((u32)sy1[sw] + sy2[sw] + sy3[sw] + sy4[sw]) / 4;
+                auto u = ((u32)su1[sw] + su2[sw]) / 2;
+                auto v = ((u32)sv1[sw] + sv2[sw]) / 2;
 
                 dy[i] = (u8)y;
                 du[i] = (u8)u;
@@ -185,14 +172,14 @@ namespace convert
                 ++i;
             }
 
-            sy1 += w4;
-            sy2 += w4;
-            sy3 += w4;
-            sy4 += w4;
-            su1 += w4;
-            su2 += w4;
-            sv1 += w4;
-            sv2 += w4;
+            sy1 += p2;
+            sy2 += p2;
+            sy3 += p2;
+            sy4 += p2;
+            su1 += p2;
+            su2 += p2;
+            sv1 += p2;
+            sv2 += p2;
         }
     }
     
@@ -585,8 +572,20 @@ namespace convert
         assert(src.length == width * height * 2);
 
         auto yuyv = offset_yuyv(format);
-        
-        yuyv_to_planar(src, dst, yuyv);
+
+        img::View1<u32> v32{};
+        v32.width = width / 2;
+        v32.height = height;
+        v32.matrix_data_ = (u32*)src.begin;
+
+        if (height == dst.height)
+        {
+            yuyv_to_planar_1_1(v32, dst, yuyv);
+        }
+        else
+        {
+           yuyv_to_planar_2_1(v32, dst, yuyv);
+        }
     }
 
 
