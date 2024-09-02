@@ -184,8 +184,13 @@ namespace convert
     }
     
 
-    static void nv12_to_planar(img::View1u8 const& src_y, img::View1<u16> const& src_uv, ViewYUV const& dst, OffsetUV uv)
+    static void nv12_to_planar_1_1(img::View1u8 const& src_y, img::View1<u16> const& src_uv, ViewYUV const& dst, OffsetUV uv)
     { 
+        assert(src_y.width == dst.width);
+        assert(src_y.height == dst.height);
+        assert(src_uv.width == dst.width / 2);
+        assert(src_uv.height == dst.height / 2);
+
         auto width = dst.width;
         auto height = dst.height;
         auto len = width * height;
@@ -231,15 +236,71 @@ namespace convert
             }
         }
     }
-    
 
-    static void yv12_to_planar(img::View1u8 const& src_y, img::View1u8 const& src_u, img::View1u8 const& src_v, ViewYUV const& dst)
-    { 
+
+    static void nv12_to_planar_2_1(img::View1u8 const& src_y, img::View1<u16> const& src_uv, ViewYUV const& dst, OffsetUV uv)
+    {
+        assert(src_y.width == dst.width * 2);
+        assert(src_y.height == dst.height * 2);
+        assert(src_uv.width == dst.width);
+        assert(src_uv.height == dst.height);
+
         auto width = dst.width;
         auto height = dst.height;
-        auto len = width * height;
+        
+        auto py = 2 * src_y.width;        
+
+        auto sy1 = src_y.matrix_data_;
+        auto sy2 = sy1 + 1;
+        auto sy3 = sy1 + src_y.width;
+        auto sy4 = sy3 + 1;
+
+        auto suv = (u8*)src_uv.matrix_data_;
+        auto su = suv + uv.u;
+        auto sv = suv + uv.v;
+
+        auto dy = dst.channel_data[(u32)YUV::Y];
+        auto du = dst.channel_data[(u32)YUV::U];
+        auto dv = dst.channel_data[(u32)YUV::V];
+
+        u32 i = 0;
+        for (u32 h = 0; h < height; h++)
+        {
+            for (u32 w = 0; w < width; w++)
+            {
+                auto sw = 2 * w;
+                auto y = ((u32)sy1[sw] + sy2[sw] + sy3[sw] + sy4[sw]) / 4;
+                dy[i] = (u8)y;
+
+                du[i] = *su;
+                dv[i] = *sv;
+
+                ++i;
+                ++su;
+                ++sv;
+            }
+
+            sy1 += py;
+            sy2 += py;
+            sy3 += py;
+            sy4 += py;
+        }
+    }
+    
+
+    static void yv12_to_planar_1_1(img::View1u8 const& src_y, img::View1u8 const& src_u, img::View1u8 const& src_v, ViewYUV const& dst)
+    { 
+        assert(src_y.width == dst.width);
+        assert(src_y.height == dst.height);
+        assert(src_u.width == dst.width / 2);
+        assert(src_u.height == dst.height / 2);
+        assert(src_v.width == dst.width / 2);
+        assert(src_v.height == dst.height / 2);
 
         img::copy(src_y, img::select_channel(dst, (u32)YUV::Y));
+
+        auto width = dst.width;
+        auto height = dst.height;
         
         auto su = src_u.matrix_data_;
         auto sv = src_v.matrix_data_;
@@ -277,6 +338,50 @@ namespace convert
                 dv3 += 2;
                 dv4 += 2;
             }
+        }
+    }
+
+
+    static void yv12_to_planar_2_1(img::View1u8 const& src_y, img::View1u8 const& src_u, img::View1u8 const& src_v, ViewYUV const& dst)
+    {
+        assert(src_y.width == dst.width * 2);
+        assert(src_y.height == dst.height * 2);
+        assert(src_u.width == dst.width);
+        assert(src_u.height == dst.height);
+        assert(src_v.width == dst.width);
+        assert(src_v.height == dst.height);
+
+        img::copy(src_u, img::select_channel(dst, (u32)YUV::U));
+        img::copy(src_y, img::select_channel(dst, (u32)YUV::Y));
+
+        auto width = dst.width;
+        auto height = dst.height;
+
+        auto src_pitch = src_y.width;
+        auto p2 = 2 * src_pitch;        
+
+        auto sy1 = src_y.matrix_data_;
+        auto sy2 = sy1 + 1;
+        auto sy3 = sy1 + src_pitch;
+        auto sy4 = sy3 + 1;
+
+        auto dy = dst.channel_data[(u32)YUV::Y];
+
+        u32 i = 0;
+        for (u32 h = 0; h < height; h++)
+        {
+            for (u32 w = 0; w < width; w++)
+            {
+                auto sw = 2 * w;
+                auto y = ((u32)sy1[sw] + sy2[sw] + sy3[sw] + sy4[sw]) / 4;
+                dy[i] = (u8)y;
+                ++i;
+            }
+
+            sy1 += p2;
+            sy2 += p2;
+            sy3 += p2;
+            sy4 += p2;
         }
     }
 }
@@ -606,14 +711,21 @@ namespace convert
 
         auto uv = offset_uv(format);
 
-        nv12_to_planar(src_y, src_uv, dst, uv);
+        if (height == dst.height)
+        {
+            nv12_to_planar_1_1(src_y, src_uv, dst, uv);
+        }
+        else
+        {
+            nv12_to_planar_2_1(src_y, src_uv, dst, uv);
+        }
     }
 
 
     static void yv12_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format)
     { 
-        //                  |--- nv12 y ---| |------- nv12 uv ------|
-        assert(src.length == width * height + 2 * width * height / 4);
+        //                  |--- yv12 y ---| |--------- yv12 u --------| |--------- yv12 v --------|
+        assert(src.length == width * height + (width / 2) * (width / 2) + (width / 2) * (width / 2) );
 
         img::View1u8 src_y{};
         src_y.width = width;
@@ -641,7 +753,14 @@ namespace convert
             break;
         }
 
-        yv12_to_planar(src_y, src_u, src_v, dst);
+        if (height == dst.height)
+        {
+            yv12_to_planar_1_1(src_y, src_u, src_v, dst);
+        }
+        else
+        {
+            yv12_to_planar_2_1(src_y, src_u, src_v, dst);
+        }
     }
 }
 
