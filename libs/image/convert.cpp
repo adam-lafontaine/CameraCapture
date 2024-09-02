@@ -63,7 +63,7 @@ namespace convert
             yuyv.y2 = 0;
             yuyv.u  = 0;
             yuyv.v  = 0;
-
+            break;
         }
 
         return yuyv;
@@ -79,12 +79,19 @@ namespace convert
         switch (pf)
         {
         case PF::NV12:
+        case PF::P010:
             uv.u = 0;
             uv.v = 1;
+            break;
+
+        case PF::NV21:
+            uv.u = 1;
+            uv.v = 0;
         
         default:
             uv.u = 0;
             uv.v = 0;
+            break;
         }
 
         return uv;
@@ -171,6 +178,54 @@ namespace convert
                 
                 su += 2;
                 sv += 2;
+
+                du1 += 2;
+                du2 += 2;
+                du3 += 2;
+                du4 += 2;
+
+                dv1 += 2;
+                dv2 += 2;
+                dv3 += 2;
+                dv4 += 2;
+            }
+        }
+    }
+    
+
+    static void yv12_to_planar(img::View1u8 const& src_y, img::View1u8 const& src_u, img::View1u8 const& src_v, ViewYUV const& dst)
+    { 
+        auto width = dst.width;
+        auto height = dst.height;
+        auto len = width * height;
+
+        img::copy(src_y, img::select_channel(dst, (u32)YUV::Y));
+        
+        auto su = src_u.matrix_data_;
+        auto sv = src_v.matrix_data_;
+
+        auto du = dst.channel_data[(u32)YUV::U];
+        auto dv = dst.channel_data[(u32)YUV::V];
+
+        for (u32 h = 0; h < height; h += 2)
+        {
+            auto du1 = du + h * width;
+            auto du2 = du1 + 1;
+            auto du3 = du1 + width;
+            auto du4 = du3 + 1;
+
+            auto dv1 = dv + h * width;
+            auto dv2 = dv1 + 1;
+            auto dv3 = dv1 + width;
+            auto dv4 = dv3 + 1;
+
+            for (u32 w = 0; w < width; w += 2)
+            {  
+                *du1 = *du2 = *du3 = *du4 = *su;
+                *dv1 = *dv2 = *dv3 = *dv4 = *sv;
+                
+                su += 1;
+                sv += 1;
 
                 du1 += 2;
                 du2 += 2;
@@ -311,24 +366,6 @@ namespace convert
         }
     }
 
-
-    static inline void span_yuyv_to_view(SpanView<u8> const& src, img::ImageView const& dst, OffsetYUYV yuyv)
-    {
-        span_yuyv_to_pixel(src, img::to_span(dst), yuyv);
-    }
-
-
-    static inline void span_yuyv_to_sub_view(SpanView<u8> const& src, img::SubView const& dst, OffsetYUYV yuyv)
-    {
-        auto const w = dst.width;
-
-        for (u32 y = 0; y < dst.height; y++)
-        {
-            span_yuyv_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
-        }
-    }
-
-
     
 }
 
@@ -342,7 +379,8 @@ namespace convert
         assert(src.length == dst.width * dst.height * 2);
 
         auto yuyv = offset_yuyv(format);
-        span_yuyv_to_view(src, dst, yuyv);
+
+        span_yuyv_to_pixel(src, img::to_span(dst), yuyv);
     }
 
 
@@ -351,7 +389,13 @@ namespace convert
         assert(src.length == dst.width * dst.height * 2);
 
         auto yuyv = offset_yuyv(format);
-        span_yuyv_to_sub_view(src, dst, yuyv);
+
+        auto const w = dst.width;
+
+        for (u32 y = 0; y < dst.height; y++)
+        {
+            span_yuyv_to_pixel(span::sub_view(src, y * w, w), img::row_span(dst, y), yuyv);
+        }
     }
     
 
@@ -411,6 +455,76 @@ namespace convert
             }
         }
     }
+    
+    
+    template <class VIEW>
+    void yv12_to_rgba(SpanView<u8> const& src, VIEW const& dst, PixelFormat format)
+    {
+        auto const width = dst.width;
+        auto const height = dst.height;
+
+        assert(src.length == width * height + width * height / 2);
+
+        auto sy = src.begin;
+        auto suv = sy + width * height;
+        auto sd = img::row_begin(dst, 0);
+
+        auto u = suv;
+        auto v = suv;
+
+        using PF = PixelFormat;
+
+        switch (format)
+        {
+        case PF::YV12:
+            u += width * height / 4;
+            break;
+
+        case PF::I420:
+        case PF::IYUV:
+            v += width * height / 4;
+            break;
+        }
+
+        for (u32 h = 0; h < height; h += 2)
+        {
+            auto y1 = sy + h * width;
+            auto y2 = y1 + 1;
+            auto y3 = y1 + width;
+            auto y4 = y3 + 1;
+
+            auto d1 = img::row_begin(dst, h);
+            auto d2 = d1 + 1;
+            auto d3 = img::row_begin(dst, h + 1);
+            auto d4 = d3 + 1;
+
+            for (u32 w = 0; w < width; w += 2)
+            {  
+                yuv_to_rgb(*y1, *u, *v, d1);
+                yuv_to_rgb(*y2, *u, *v, d2);
+                yuv_to_rgb(*y3, *u, *v, d3);
+                yuv_to_rgb(*y4, *u, *v, d4);
+
+                d1->alpha = 255;
+                d2->alpha = 255;
+                d3->alpha = 255;
+                d4->alpha = 255;
+
+                y1 += 2;
+                y2 += 2;
+                y3 += 2;
+                y4 += 2;
+
+                d1 += 2;
+                d2 += 2;
+                d3 += 2;
+                d4 += 2;
+
+                u += 1;
+                v += 1;
+            }
+        }
+    }
 }
 
 
@@ -452,6 +566,41 @@ namespace convert
 
         nv12_to_planar(src_y, src_uv, dst, uv);
     }
+
+
+    static void yv12_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format)
+    { 
+        //                  |--- nv12 y ---| |------- nv12 uv ------|
+        assert(src.length == width * height + 2 * width * height / 4);
+
+        img::View1u8 src_y{};
+        src_y.width = width;
+        src_y.height = height;
+        src_y.matrix_data_ = src.begin;
+
+        img::View1u8 src_u{};
+        src_u.width = width / 2;
+        src_u.height = height / 2;
+        src_u.matrix_data_ = src.begin + width * height;
+
+        auto src_v = src_u;
+
+        using PF = PixelFormat;
+
+        switch (format)
+        {
+        case PF::YV12:
+            src_u.matrix_data_ += width * height / 4;
+            break;
+
+        case PF::I420:
+        case PF::IYUV:
+            src_v.matrix_data_ += width * height / 4;
+            break;
+        }
+
+        yv12_to_planar(src_y, src_u, src_v, dst);
+    }
 }
 
 
@@ -481,6 +630,9 @@ namespace convert
         case PF::NV12:
         case PF::NV21:
         case PF::P010:
+        case PF::YV12:
+        case PF::I420:
+        case PF::IYUV:
             is_valid = src_len == width * height + width * height / 2;
             break;
 
@@ -514,6 +666,12 @@ namespace convert
         case PF::P010:
             nv12_to_rgba(src, dst, format);
             break;
+        
+        case PF::YV12:
+        case PF::I420:
+        case PF::IYUV:
+            yv12_to_rgba(src, dst, format);
+            break;
 
         default:
             img::fill(dst, img::to_pixel(100));
@@ -543,6 +701,12 @@ namespace convert
         case PF::P010:
             nv12_to_rgba(src, dst, format);
             break;
+        
+        case PF::YV12:
+        case PF::I420:
+        case PF::IYUV:
+            yv12_to_rgba(src, dst, format);
+            break;
 
         default:
             img::fill(dst, img::to_pixel(100));
@@ -571,6 +735,12 @@ namespace convert
         case PF::NV21:
         case PF::P010:
             nv12_to_yuv(src, width, height, dst, format);
+            break;
+
+        case PF::YV12:
+        case PF::I420:
+        case PF::IYUV:
+            yv12_to_yuv(src, width, height, dst, format);
             break;
         }
     }
