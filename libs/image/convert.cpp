@@ -98,14 +98,13 @@ namespace convert
     }
     
 
-    static void yuyv_to_planar(img::View1<u32> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
+    static void yuyv_to_planar(SpanView<u8> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
     {
-        assert(src.width == dst.width);
-        assert(src.height == dst.height);
+        assert(src.length == dst.width * dst.height * 2);
 
-        auto const len = src.width * src.height * 2;
+        auto const len = src.length;
 
-        auto s = (u8*)src.matrix_data_;
+        auto s = src.begin;
 
         auto sy1 = s + yuyv.y1;
         auto sy2 = s + yuyv.y2;
@@ -140,6 +139,60 @@ namespace convert
             dy2 += 2;
             du2 += 2;
             dv2 += 2;
+        }
+    }
+
+
+    static void yuyv_to_planar_scale2(SpanView<u8> const& src, ViewYUV const& dst, OffsetYUYV yuyv)
+    {
+        auto w2 = dst.width * 2;
+        auto h2 = dst.height * 2;
+
+        assert(src.length == w2 * h2 * 2);
+
+        auto w4 = 2 * w2;
+
+        auto s = src.begin;
+
+        auto sy1 = s + yuyv.y1;
+        auto sy2 = s + yuyv.y2;
+        auto sy3 = sy1 + w2;
+        auto sy4 = sy2 + w2;
+
+        auto su1 = s + yuyv.u;
+        auto su2 = su1 + w2;
+
+        auto sv1 = s + yuyv.v;
+        auto sv2 = sv1 + w2;
+
+        auto dy = dst.channel_data[(int)YUV::Y];
+        auto du = dst.channel_data[(int)YUV::U];
+        auto dv = dst.channel_data[(int)YUV::V];
+
+        u32 i = 0;
+        for (u32 h = 0; h < dst.height; h++)
+        {
+            for (u32 w = 0; w < dst.width; w++)
+            {
+                auto y = ((u32)sy1[w] + sy2[w] + sy3[w] + sy4[w]) / 4;
+                auto u = ((u32)su1[w] + su2[w]) / 2;
+                auto v = ((u32)sv1[w] + sv2[w]) / 2;
+
+                dy[i] = (u8)y;
+                du[i] = (u8)u;
+                dv[i] = (u8)v;
+
+                ++i;
+            }
+
+            sy1 += w4;
+            sy2 += w4;
+            sy3 += w4;
+            sy4 += w4;
+            su1 += w4;
+            su2 += w4;
+            sv1 += w4;
+            sv2 += w4;
         }
     }
     
@@ -335,6 +388,8 @@ namespace convert
 }
 
 
+/* to rgba */
+
 namespace convert
 {
     static void span_yuyv_to_pixel(SpanView<u8> const& src, SpanView<img::Pixel> const& dst, OffsetYUYV yuyv)
@@ -366,15 +421,8 @@ namespace convert
         }
     }
 
-    
-}
 
-
-/* to rgba */
-
-namespace convert
-{
-    void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst, PixelFormat format)
+    static void yuyv_to_rgba(SpanView<u8> const& src, img::ImageView const& dst, PixelFormat format)
     {
         assert(src.length == dst.width * dst.height * 2);
 
@@ -384,7 +432,7 @@ namespace convert
     }
 
 
-    void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format)
+    static void yuyv_to_rgba(SpanView<u8> const& src, img::SubView const& dst, PixelFormat format)
     {
         assert(src.length == dst.width * dst.height * 2);
 
@@ -400,7 +448,7 @@ namespace convert
     
 
     template <class VIEW>
-    void nv12_to_rgba(SpanView<u8> const& src, VIEW const& dst, PixelFormat format)
+    static void nv12_to_rgba(SpanView<u8> const& src, VIEW const& dst, PixelFormat format)
     {
         auto const width = dst.width;
         auto const height = dst.height;
@@ -458,7 +506,7 @@ namespace convert
     
     
     template <class VIEW>
-    void yv12_to_rgba(SpanView<u8> const& src, VIEW const& dst, PixelFormat format)
+    static void yv12_to_rgba(SpanView<u8> const& src, VIEW const& dst, PixelFormat format)
     {
         auto const width = dst.width;
         auto const height = dst.height;
@@ -536,14 +584,9 @@ namespace convert
     {
         assert(src.length == width * height * 2);
 
-        img::View1<u32> v32{};
-        v32.width = width;
-        v32.height = height;
-        v32.matrix_data_ = (u32*)src.begin;
-
         auto yuyv = offset_yuyv(format);
         
-        yuyv_to_planar(v32, dst, yuyv);
+        yuyv_to_planar(src, dst, yuyv);
     }
 
 
