@@ -177,7 +177,7 @@ namespace camera_usb
 
         for (u32 i = 0; i < N; i++)
         {
-            auto format = uvc::opt::find_frame_format(device.h_device, (u32)formats[i], 30);
+            auto format = uvc::opt::find_frame_format(device.h_device, (u32)formats[i], 640, 480);
             if (format.ok)
             {
                 return format;
