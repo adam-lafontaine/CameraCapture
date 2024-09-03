@@ -156,7 +156,7 @@ namespace camera_usb
     {
         using PF = cvt::PixelFormat;
 
-        constexpr u32 N = 9;
+        constexpr u32 N = 14;
 
         PF formats[N] {
             PF::YUYV,
@@ -167,19 +167,30 @@ namespace camera_usb
             PF::Y422,
             PF::UYNV,
             PF::HDYC,
-            PF::NV12
+            PF::NV12,
+            PF::NV21,
+            PF::YV12,
+            PF::I420,
+            PF::IYUV,
+            PF::P010
         };
+
+        uvc::opt::FrameFormat ff;
+        ff.interval = 0;
 
         for (u32 i = 0; i < N; i++)
         {
-            auto format = uvc::opt::find_frame_format(device.h_device, (u32)formats[i], 30);
-            if (format.ok)
+            auto format = uvc::opt::find_frame_format_by_wh(device.h_device, (u32)formats[i], 640, 480);
+            if (!format.ok)
             {
-                return format;
+                continue;
+            }
+
+            if (!ff.interval || format.interval < ff.interval)
+            {
+                ff = format;
             }
         }
-
-        uvc::opt::FrameFormat ff;
 
         return ff;        
     }

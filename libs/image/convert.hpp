@@ -22,32 +22,27 @@ namespace convert
 
     enum class PixelFormat : u32
     {
-        RGB32  = 22, // D3DFMT_X8R8G8B8
-        ARGB32 = 21, // D3DFMT_A8R8G8B8
-        RGB24  = 20, // D3DFMT_R8G8B8
-        RGB555 = 25, // D3DFMT_X1R5G5B5
-        RGB565 = 23, // D3DFMT_R5G6B5
-        RGB8   = 41, // D3DFMT_P8
-        L8     = 50, // D3DFMT_L8
-        L16    = 81, // D3DFMT_L16
-        D16    = 80, // D3DFMT_D16
-
-        AI44 = fcc_to_u32("AI44"),
-        AYUV = fcc_to_u32("AYUV"),
+        // supported
         YUYV = fcc_to_u32("YUYV"),
         YUNV = fcc_to_u32("YUNV"),
         YUY2 = fcc_to_u32("YUY2"),
         YVYU = fcc_to_u32("YVYU"),
-        YVU9 = fcc_to_u32("YVU9"),
         UYVY = fcc_to_u32("UYVY"),
         Y422 = fcc_to_u32("Y422"),
         UYNV = fcc_to_u32("UYNV"),
         HDYC = fcc_to_u32("HDYC"),
-        NV11 = fcc_to_u32("NV11"),
         NV12 = fcc_to_u32("NV12"),
+        NV21 = fcc_to_u32("NV21"),
         YV12 = fcc_to_u32("YV12"),
         I420 = fcc_to_u32("I420"),
         IYUV = fcc_to_u32("IYUV"),
+        P010 = fcc_to_u32("P010"),
+        
+        // not supported
+        AI44 = fcc_to_u32("AI44"),
+        AYUV = fcc_to_u32("AYUV"),        
+        YVU9 = fcc_to_u32("YVU9"),        
+        NV11 = fcc_to_u32("NV11"),        
         Y210 = fcc_to_u32("Y210"),
         Y216 = fcc_to_u32("Y216"),
         Y410 = fcc_to_u32("Y410"),
@@ -57,8 +52,6 @@ namespace convert
         Y42T = fcc_to_u32("Y42T"),
         P210 = fcc_to_u32("P210"),
         P216 = fcc_to_u32("P216"),
-        P010 = fcc_to_u32("P010"),
-        P016 = fcc_to_u32("P016"),
         v210 = fcc_to_u32("v210"),
         v216 = fcc_to_u32("v216"),
         v410 = fcc_to_u32("v410"),
@@ -90,6 +83,16 @@ namespace convert
         VP90 = fcc_to_u32("VP90"),
         ORAW = fcc_to_u32("ORAW"),
         H263 = fcc_to_u32("H263"),
+
+        RGB32  = 22, // D3DFMT_X8R8G8B8
+        ARGB32 = 21, // D3DFMT_A8R8G8B8
+        RGB24  = 20, // D3DFMT_R8G8B8
+        RGB555 = 25, // D3DFMT_X1R5G5B5
+        RGB565 = 23, // D3DFMT_R5G6B5
+        RGB8   = 41, // D3DFMT_P8
+        L8     = 50, // D3DFMT_L8
+        L16    = 81, // D3DFMT_L16
+        D16    = 80, // D3DFMT_D16
 
         A2R10G10B10   = 31,  // D3DFMT_A2B10G10R10
         A16B16G16R16F = 113, // D3DFMT_A16B16G16R16F
