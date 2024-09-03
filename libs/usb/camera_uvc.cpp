@@ -156,7 +156,7 @@ namespace camera_usb
     {
         using PF = cvt::PixelFormat;
 
-        constexpr u32 N = 9;
+        constexpr u32 N = 14;
 
         PF formats[N] {
             PF::YUYV,
@@ -167,7 +167,12 @@ namespace camera_usb
             PF::Y422,
             PF::UYNV,
             PF::HDYC,
-            PF::NV12
+            PF::NV12,
+            PF::NV21,
+            PF::YV12,
+            PF::I420,
+            PF::IYUV,
+            PF::P010
         };
 
         for (u32 i = 0; i < N; i++)
