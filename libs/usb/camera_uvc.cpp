@@ -175,16 +175,22 @@ namespace camera_usb
             PF::P010
         };
 
+        uvc::opt::FrameFormat ff;
+        ff.interval = 0;
+
         for (u32 i = 0; i < N; i++)
         {
-            auto format = uvc::opt::find_frame_format(device.h_device, (u32)formats[i], 640, 480);
-            if (format.ok)
+            auto format = uvc::opt::find_frame_format_by_wh(device.h_device, (u32)formats[i], 640, 480);
+            if (!format.ok)
             {
-                return format;
+                continue;
+            }
+
+            if (!ff.interval || format.interval < ff.interval)
+            {
+                ff = format;
             }
         }
-
-        uvc::opt::FrameFormat ff;
 
         return ff;        
     }

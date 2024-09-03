@@ -896,9 +896,9 @@ namespace opt
         b8 ok = 0;
     };
 
-    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps);
+    FrameFormat find_frame_format_by_fps(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps);
 
-    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 width, u32 height);
+    FrameFormat find_frame_format_by_wh(uvc_device_handle *devh, u32 four_cc_bytes, u32 width, u32 height);
 
 
 
@@ -9461,7 +9461,7 @@ namespace opt
     }
 
 
-    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps)
+    FrameFormat find_frame_format_by_fps(uvc_device_handle *devh, u32 four_cc_bytes, u32 min_fps)
     {
         FrameFormat ff;
         ff.interval = 0;
@@ -9511,7 +9511,7 @@ namespace opt
     }
 
 
-    FrameFormat find_frame_format(uvc_device_handle *devh, u32 four_cc_bytes, u32 width, u32 height)
+    FrameFormat find_frame_format_by_wh(uvc_device_handle *devh, u32 four_cc_bytes, u32 width, u32 height)
     {
         FrameFormat ff;
         ff.interval = 0;
