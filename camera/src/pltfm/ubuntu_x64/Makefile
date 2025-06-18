@@ -1,7 +1,7 @@
 GPP := g++-11
 
 GPP += -std=c++20
-GPP += -mavx
+GPP += -mavx -mavx2 -mfma
 #GPP += -O3
 #GPP += -DNDEBUG
 
