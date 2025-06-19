@@ -19,11 +19,7 @@
 
 #ifdef IMGUI_IMPLEMENTATION
 #include "../../imgui.cpp"
-
-#ifndef NDEBUG
 #include "../../imgui_demo.cpp"
-#endif
-
 #include "../../imgui_draw.cpp"
 #include "../../imgui_tables.cpp"
 #include "../../imgui_widgets.cpp"
