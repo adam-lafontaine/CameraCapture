@@ -5,9 +5,8 @@
 #include "../../../../libs/span/span.cpp"
 #include "../../../../libs/stb_image/stb_image_options.hpp"
 
-#include "../../camera_display/camera_display.cpp"
-#include "../../input_display/input_display.cpp"
-#include "../../diagnostics/diagnostics.cpp"
+#include "../../../../camera/src/camera_display/camera_display.cpp"
+#include "../../../../camera/src/diagnostics/diagnostics.cpp"
 
-//#include "../../../../libs/usb/camera_uvc.cpp"
-#include "../../../../libs/image/convert.cpp"
+#include "../../../../libs/usb/camera_sdl.cpp"
+//#include "../../../../libs/image/convert.cpp"

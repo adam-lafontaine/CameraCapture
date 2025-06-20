@@ -30,6 +30,13 @@ namespace sdl
         printf("%s\n%s\n", msg, SDL_GetError());
     #endif
     }
+
+
+    static u32 ns_to_fps(Uint64 ns)
+    {
+        constexpr f32 nano = (f32)SDL_NS_PER_SECOND;
+        return num::round_to_unsigned<u32>(nano / ns);
+    }
 }
 
 
@@ -57,7 +64,7 @@ namespace camera_usb
         SDL_Camera* p_device = 0;
         SDL_CameraSpec spec;
 
-        f32 grab_ms;
+        f32 grab_ns;
 
         img::ImageView rgba;
         img::View3u8 view3; // planar rgb or yuv        
@@ -378,8 +385,8 @@ namespace camera_usb
 
         auto end = SDL_GetTicksNS();
 
-        device.grab_ms = end - start;
-        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+        device.grab_ns = end - start;
+        camera.fps = sdl::ns_to_fps(device.grab_ns);
 
         camera.busy = 0;
     }
@@ -405,8 +412,8 @@ namespace camera_usb
 
             auto end = SDL_GetTicksNS();
 
-            device.grab_ms = end - start;
-            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+            device.grab_ns = end - start;
+            camera.fps = sdl::ns_to_fps(device.grab_ns);
         }
 
         camera.busy = 0;
@@ -434,8 +441,8 @@ namespace camera_usb
 
             auto end = SDL_GetTicksNS();
 
-            device.grab_ms = end - start;
-            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+            device.grab_ns = end - start;
+            camera.fps = sdl::ns_to_fps(device.grab_ns);
         }
 
         camera.busy = 0;
@@ -459,8 +466,8 @@ namespace camera_usb
 
         auto end = SDL_GetTicksNS();
 
-        device.grab_ms = end - start;
-        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+        device.grab_ns = end - start;
+        camera.fps = sdl::ns_to_fps(device.grab_ns);
 
         camera.busy = 0;
     }
@@ -482,8 +489,8 @@ namespace camera_usb
 
         auto end = SDL_GetTicksNS();
 
-        device.grab_ms = end - start;
-        camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+        device.grab_ns = end - start;
+        camera.fps = sdl::ns_to_fps(device.grab_ns);
 
         camera.busy = 0;
     }
@@ -509,8 +516,8 @@ namespace camera_usb
 
             auto end = SDL_GetTicksNS();
 
-            device.grab_ms = end - start;
-            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+            device.grab_ns = end - start;
+            camera.fps = sdl::ns_to_fps(device.grab_ns);
         }
 
         camera.busy = 0;
@@ -538,8 +545,8 @@ namespace camera_usb
 
             auto end = SDL_GetTicksNS();
 
-            device.grab_ms = end - start;
-            camera.fps = num::round_to_unsigned<u32>(1000.0 / device.grab_ms);
+            device.grab_ns = end - start;
+            camera.fps = sdl::ns_to_fps(device.grab_ns);
         }
 
         camera.busy = 0;
