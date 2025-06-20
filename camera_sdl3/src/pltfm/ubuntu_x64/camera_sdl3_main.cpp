@@ -1,5 +1,5 @@
 #include "../imgui_sdl3_ogl3/imgui_include.hpp"
-#include "../../../../camera/src/camera_display/camera_display.hpp"
+#include "../../camera_display/camera_display.hpp"
 
 namespace img = image;
 namespace cdsp = camera_display;
@@ -8,7 +8,7 @@ namespace cdsp = camera_display;
 static void set_window_icon(SDL_Window* window)
 {
 #include "../../../../resources/icon_64.c" // this will "paste" the struct my_icon into this function
-    sdl::set_window_icon(window, icon_64);
+    ui_imgui::set_window_icon(window, icon_64);
 }
 
 
@@ -92,6 +92,7 @@ static void init_camera_display()
 
 static void render_imgui_frame()
 {
+    ui_imgui::handle_sdl_events(mv::ui_state);
     ui_imgui::new_frame();
     ui_imgui::show_imgui_demo(mv::ui_state);
 
@@ -103,6 +104,11 @@ static void render_imgui_frame()
 
 
     ui_imgui::render(mv::ui_state);
+
+    if (mv::ui_state.cmd_end_program)
+    {
+        end_program();
+    }
 }
 
 
@@ -111,8 +117,8 @@ static bool main_init()
     mv::ui_state.window_title = "USB Camera";
 
     // fullscreen
-    mv::ui_state.window_width = 0;
-    mv::ui_state.window_height = 0;
+    mv::ui_state.window_width = 1000;
+    mv::ui_state.window_height = 800;
 
     if (!ui_imgui::init(mv::ui_state))
     {
@@ -130,6 +136,7 @@ static bool main_init()
 
 static void main_close()
 {
+    //cdsp::close_async(mv::camera_state);
     ui_imgui::close(mv::ui_state);
     mb::destroy_buffer(mv::camera_buffer);
 }
@@ -143,6 +150,8 @@ static void main_loop()
     {
         //ogl_imgui::render_texture(camera_texture);
         render_imgui_frame();
+
+        
     }
 }
 

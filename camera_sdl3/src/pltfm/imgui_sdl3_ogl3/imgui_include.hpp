@@ -29,6 +29,9 @@ namespace ui_imgui
         SDL_Window* window = 0;
         SDL_GLContext gl_context = 0;
 
+        bool is_fullscreen = false;
+        bool cmd_end_program = false;
+
     #ifdef SHOW_IMGUI_DEMO
 
         bool show_demo_window = true;
@@ -38,7 +41,7 @@ namespace ui_imgui
     };
 
 
-    bool init(UIState& state)
+    inline bool init(UIState& state)
     {
         auto sdl_flags = SDL_INIT_VIDEO;
 
@@ -61,6 +64,7 @@ namespace ui_imgui
         if (!state.window_width || !state.window_height)
         {
             window_flags |= SDL_WINDOW_FULLSCREEN;
+            state.is_fullscreen = true;
         }
 
         SDL_Window* window = 
@@ -153,7 +157,7 @@ namespace ui_imgui
     }
 
 
-    void new_frame()
+    inline void new_frame()
     {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -164,7 +168,7 @@ namespace ui_imgui
     }
     
     
-    void render(UIState& state)
+    inline void render(UIState& state)
     {
         auto& io = ImGui::GetIO();
         auto& clear_color = state.clear_color;
@@ -192,7 +196,7 @@ namespace ui_imgui
     }
 
 
-    void close(UIState& state)
+    inline void close(UIState& state)
     {
         // Cleanup
         ImGui_ImplOpenGL3_Shutdown();
@@ -204,38 +208,95 @@ namespace ui_imgui
         SDL_Quit();
     }
 
+}
 
+
+/* sdl wrappers */
+
+namespace ui_imgui
+{
     inline void set_window_icon(SDL_Window* window, auto const& icon_64)
     {
-        // these masks are needed to tell SDL_CreateRGBSurface(From)
-        // to assume the data it gets is byte-wise RGB(A) data
-        Uint32 rmask, gmask, bmask, amask;
-    #if SDL_BYTEORDER == SDL_BIG_ENDIAN
-        int shift = (icon_64.bytes_per_pixel == 3) ? 8 : 0;
-        rmask = 0xff000000 >> shift;
-        gmask = 0x00ff0000 >> shift;
-        bmask = 0x0000ff00 >> shift;
-        amask = 0x000000ff >> shift;
-    #else // little endian, like x86
-        rmask = 0x000000ff;
-        gmask = 0x0000ff00;
-        bmask = 0x00ff0000;
-        amask = (icon_64.bytes_per_pixel == 3) ? 0 : 0xff000000;
-    #endif
-
-        SDL_Surface* icon = SDL_CreateRGBSurfaceFrom(
+        SDL_Surface* icon = SDL_CreateSurfaceFrom(
+            (int)icon_64.width,
+            (int)icon_64.height,
+            SDL_PIXELFORMAT_ABGR8888,
             (void*)icon_64.pixel_data,
-            icon_64.width,
-            icon_64.height,
-            icon_64.bytes_per_pixel * 8,
-            icon_64.bytes_per_pixel * icon_64.width,
-            rmask, gmask, bmask, amask);
+            icon_64.bytes_per_pixel * icon_64.width
+        );
 
         SDL_SetWindowIcon(window, icon);
 
-        SDL_FreeSurface(icon);
+        SDL_DestroySurface(icon);
     }
 
+
+    inline void handle_sdl_events(UIState& state)
+    {
+        SDL_Keycode key_code;
+        SDL_Scancode scan_code;
+
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            auto window = SDL_GetWindowFromID(event.window.windowID);
+
+            switch (event.type)
+            {
+            case SDL_EVENT_WINDOW_RESIZED:
+            {
+                int w, h;
+                SDL_GetWindowSize(window, &w, &h);
+                glViewport(0, 0, w, h);
+            } break;
+
+            case SDL_EVENT_QUIT:
+            {
+                state.cmd_end_program = true;
+            } break;
+
+            case SDL_EVENT_KEY_DOWN:
+            {
+                key_code = event.key.key;
+                scan_code = event.key.scancode;
+                auto alt = event.key.mod & SDL_KMOD_ALT;
+
+                switch (key_code)
+                {
+                case SDLK_F4:
+                {
+                    state.cmd_end_program = true;
+                } break;
+
+                #ifndef NDEBUG
+
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                {
+                    state.is_fullscreen = !state.is_fullscreen;
+                    SDL_SetWindowFullscreen(window, state.is_fullscreen);
+                } break;
+
+                case SDLK_ESCAPE:
+                {
+                    state.cmd_end_program = true;
+                } break;
+
+                #endif
+
+                default:
+                    break;
+                }
+
+            } break;
+
+            default:
+                break;
+            }
+
+            ImGui_ImplSDL3_ProcessEvent(&event);
+        }
+    }
 }
 
 

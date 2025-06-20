@@ -179,7 +179,7 @@ namespace camera_usb
             return false;
         }
 
-        auto s = surface->pixels;
+        auto s = (u8*)surface->pixels;
         auto w = (u32)surface->w;
 
         auto src_row = span::make_view((img::Pixel*)s, w);
@@ -195,6 +195,8 @@ namespace camera_usb
         }
 
         SDL_ReleaseCameraFrame(device.p_device, surface);
+
+        return false;
     }
 }
 
