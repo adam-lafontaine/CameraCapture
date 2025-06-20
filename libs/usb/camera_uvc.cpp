@@ -21,7 +21,11 @@ namespace camera_usb
     namespace img = image;
     namespace cvt = convert;
 
-    constexpr u8 DEVICE_COUNT_MAX = 16;
+    constexpr u32 DEVICE_COUNT_MAX = sizeof(CameraList::list) / sizeof(Camera);
+
+    // TODO
+    constexpr u32 FRAME_HEIGHT_PX = HEIGHT_MAX;
+    constexpr u32 FRAME_WIDTH_PX = WIDTH_MAX;
 
 
     class DeviceConfigUVC
@@ -180,7 +184,7 @@ namespace camera_usb
 
         for (u32 i = 0; i < N; i++)
         {
-            auto format = uvc::opt::find_frame_format_by_wh(device.h_device, (u32)formats[i], 640, 480);
+            auto format = uvc::opt::find_frame_format_by_wh(device.h_device, (u32)formats[i], FRAME_WIDTH_PX, FRAME_HEIGHT_PX);
             if (!format.ok)
             {
                 continue;
@@ -576,7 +580,7 @@ namespace camera_usb
             return cameras;
         }
 
-        cameras.count = uvc_list.count;
+        cameras.count = num::min(DEVICE_COUNT_MAX, uvc_list.count);
         for (u32 i = 0; i < cameras.count; i++)
         {
             auto& camera = cameras.list[i];
