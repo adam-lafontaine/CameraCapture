@@ -3,8 +3,8 @@
 #include "imgui_options.hpp"
 
 // v1.91.5
-#include "../../../../libs/imgui_1_89/backends/imgui_impl_sdl2.h"
-#include "../../../../libs/imgui_1_89/backends/imgui_impl_opengl3.h"
+#include "../../../../libs/imgui_1_91/backends/imgui_impl_sdl2.h"
+#include "../../../../libs/imgui_1_91/backends/imgui_impl_opengl3.h"
 
 #if defined(_WIN32)
 #define SDL_MAIN_HANDLED
@@ -173,8 +173,8 @@ namespace ui_imgui
         ImGui::NewFrame();
 
         // Rendering
-        //ImGui::DockSpaceOverViewport();
-        ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_None);
+        ImGui::DockSpaceOverViewport();
+        //ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_None);
     }
     
     

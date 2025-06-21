@@ -4,10 +4,10 @@
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 
-//#define IMGUI_USE_STB_SPRINTF
-//#define IMGUI_DISABLE_STB_SPRINTF_IMPLEMENTATION
+#define IMGUI_USE_STB_SPRINTF
+#define IMGUI_DISABLE_STB_SPRINTF_IMPLEMENTATION
 //#define IMGUI_STB_SPRINTF_FILENAME "../stb_libs/stb_sprintf.h"
-//#define IMGUI_STB_SPRINTF_FILENAME "../qsprintf/stb_sprintf.h"
+#define IMGUI_STB_SPRINTF_FILENAME "../qsprintf/stb_sprintf.h"
 
 
 #ifndef NDEBUG

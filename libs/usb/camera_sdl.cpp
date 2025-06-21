@@ -239,13 +239,11 @@ namespace camera_usb
     {
         int count = 0;
         SDL_CameraID* ids = SDL_GetCameras(&count);
-        if (!ids)
+        if (!ids || !count)
         {
             sdl::print_error("SDL_GetCameras()");
             return false;
         }
-
-        assert(count && "NO CAMERAS");
 
         list.count = 0;
         for (int i = 0; i < count; i++)
@@ -264,8 +262,6 @@ namespace camera_usb
         }
 
         SDL_free(ids);
-
-        
 
         return true;
     }
