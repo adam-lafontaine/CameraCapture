@@ -394,9 +394,9 @@ namespace ogl_imgui
 
         GLuint gl_ref_data[count] = { 0 };
 
-        Texture& get_ogl_texture(TextureId id) { return data[id.value]; }
+        Texture& get_gl_texture_ref(TextureId id) { return data[id.value]; }
 
-        ImTextureID get_imgui_texture(TextureId id) { return (ImTextureID)(intptr_t)get_ogl_texture(id).gl_ref; }
+        ImTextureID get_im_texture_id(TextureId id) { return (ImTextureID)(intptr_t)get_gl_texture_ref(id).gl_ref; }
     };
 
 

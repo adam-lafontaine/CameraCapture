@@ -6,6 +6,10 @@
 #include "../../../../libs/imgui_1_89/backends/imgui_impl_sdl2.h"
 #include "../../../../libs/imgui_1_89/backends/imgui_impl_opengl3.h"
 
+#if defined(_WIN32)
+#define SDL_MAIN_HANDLED
+#endif
+
 #include <SDL2/SDL.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <SDL_opengles2.h>
@@ -153,6 +157,8 @@ namespace ui_imgui
         style.Colors[ImGuiCol_Text] = TEXT_WHITE;
         style.TabRounding = 0.0f;
 
+        glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+
         state.window = window;
         state.gl_context = gl_context;
 
@@ -167,7 +173,8 @@ namespace ui_imgui
         ImGui::NewFrame();
 
         // Rendering
-        ImGui::DockSpaceOverViewport();
+        //ImGui::DockSpaceOverViewport();
+        ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_None);
     }
     
     
@@ -423,9 +430,9 @@ namespace ogl_imgui
 
         GLuint gl_ref_data[count] = { 0 };
 
-        Texture& get_ogl_texture(TextureId id) { return data[id.value]; }
+        Texture& get_gl_texture_ref(TextureId id) { return data[id.value]; }
 
-        ImTextureID get_imgui_texture(TextureId id) { return (ImTextureID)(intptr_t)get_ogl_texture(id).gl_ref; }
+        ImTextureID get_im_texture_id(TextureId id) { return (ImTextureID)(intptr_t)get_gl_texture_ref(id).gl_ref; }
     };
 
 

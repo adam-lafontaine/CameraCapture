@@ -245,10 +245,13 @@ namespace camera_usb
             return false;
         }
 
+        assert(count && "NO CAMERAS");
+
         list.count = 0;
         for (int i = 0; i < count; i++)
         {
             auto id = ids[i];
+            printf("ID: %u\n", id);
             if (!id)
             {
                 continue;
@@ -261,6 +264,8 @@ namespace camera_usb
         }
 
         SDL_free(ids);
+
+        
 
         return true;
     }

@@ -89,7 +89,7 @@ static void init_camera_display()
     cdsp::init_async(mv::camera_state);
 
     auto data = mv::camera_state.display.matrix_data_;
-    auto t = mv::textures.get_ogl_texture(mv::camera_texture_id);
+    auto& t = mv::textures.get_gl_texture_ref(mv::camera_texture_id);
 
     ogl_imgui::init_texture(data, w, h, t);
 }
@@ -97,11 +97,10 @@ static void init_camera_display()
 
 static void render_imgui_frame()
 {
-    ui_imgui::handle_sdl_events(mv::ui_state);
     ui_imgui::new_frame();
     ui_imgui::show_imgui_demo(mv::ui_state);
     
-    auto t = mv::textures.get_imgui_texture(mv::camera_texture_id);
+    auto t = mv::textures.get_im_texture_id(mv::camera_texture_id);
     auto w = mv::camera_state.display.width;
     auto h = mv::camera_state.display.height;
     auto scale = 1.0f;
@@ -111,10 +110,7 @@ static void render_imgui_frame()
 
     ui_imgui::render(mv::ui_state);
 
-    if (mv::ui_state.cmd_end_program)
-    {
-        end_program();
-    }
+    
 }
 
 
@@ -150,12 +146,21 @@ static void main_close()
 
 static void main_loop()
 {
+    auto& camera_texture = mv::textures.get_gl_texture_ref(mv::camera_texture_id);
+
     while(is_running())
     {
-        auto camera_texture = mv::textures.get_ogl_texture(mv::camera_texture_id);
+        ui_imgui::handle_sdl_events(mv::ui_state);
+        
+        
         ogl_imgui::render_texture(camera_texture);
 
         render_imgui_frame();
+
+        if (mv::ui_state.cmd_end_program)
+        {
+            end_program();
+        }
     }
 }
 
