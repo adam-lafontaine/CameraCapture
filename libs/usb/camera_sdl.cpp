@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "../image/convert.hpp"
 #include "../util/numeric.hpp"
 
 
@@ -47,6 +48,7 @@ namespace camera_usb
     namespace num = numeric;
     namespace img = image;
     namespace mb = memory_buffer;
+    namespace cvt = convert;
 
 
     constexpr u32 DEVICE_COUNT_MAX = sizeof(CameraList::list) / sizeof(Camera);
@@ -92,7 +94,7 @@ namespace camera_usb
 
 namespace camera_usb
 {
-    static SDL_CameraSpec format_rgba(DeviceSDL& device, u32 width, u32 height)
+    static SDL_CameraSpec format_yv12(DeviceSDL& device, u32 width, u32 height)
     {
         /*SDL_CameraSpec s{};
         s.format = SDL_PIXELFORMAT_RGBA32;
@@ -126,10 +128,12 @@ namespace camera_usb
 
         SDL_CameraSpec s{};
 
-        s.colorspace = SDL_COLORSPACE_RGB_DEFAULT;
-        s.format = SDL_PIXELFORMAT_RGBA32;
+        s.colorspace = SDL_COLORSPACE_YUV_DEFAULT;
+        s.format = SDL_PIXELFORMAT_YV12;
         s.width = width;
         s.height = height;
+        s.framerate_numerator = 10'000'000;
+        s.framerate_denominator = 10'000'000 / 30;
 
         return s;
     }
@@ -143,7 +147,7 @@ namespace camera_usb
             return false;
         }
 
-        auto format = format_rgba(device, FRAME_WIDTH_PX, FRAME_HEIGHT_PX);
+        auto format = format_yv12(device, FRAME_WIDTH_PX, FRAME_HEIGHT_PX);
 
         auto camera = SDL_OpenCamera(device.device_id, &format);
         if (!camera)
@@ -196,7 +200,33 @@ namespace camera_usb
 
         SDL_ReleaseCameraFrame(device.p_device, surface);
 
-        return false;
+        return true;
+    }
+
+
+    static bool grab_and_convert_frame_yuv(DeviceSDL& device, img::View3u8 const& dst)
+    {
+        Uint64 ts = 0;
+        SDL_Surface* frame = 0;
+        while (!frame)
+        {
+            frame = SDL_AcquireCameraFrame(device.p_device, &ts);
+        }
+
+        auto data = (u8*)frame->pixels;
+        auto w = (u32)frame->w;
+        auto h = (u32)frame->h;
+        auto len = w * h + w * h / 2;
+
+        auto span = span::make_view(data, len);
+
+        auto format = cvt::PixelFormat::YV12;
+
+        cvt::to_yuv(span, w, h, dst, format);
+
+        SDL_ReleaseCameraFrame(device.p_device, frame);
+
+        return true;
     }
 }
 
@@ -270,9 +300,9 @@ namespace camera_usb
 
         cameras.status = ConnectionStatus::Connecting;
 
-        if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
+        if (!SDL_InitSubSystem(SDL_INIT_CAMERA))
         {
-            sdl::print_error("SDL_InitSubSystem(SDL_INIT_VIDEO)");
+            sdl::print_error("SDL_InitSubSystem(SDL_INIT_CAMERA)");
             quit();
             return cameras;
         }
@@ -337,7 +367,7 @@ namespace camera_usb
             camera.status = CameraStatus::Inactive;
         }
 
-        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        SDL_QuitSubSystem(SDL_INIT_CAMERA);
     }
 
 
@@ -350,6 +380,13 @@ namespace camera_usb
         {
             return false;
         }
+
+        camera.frame_width = device.spec.width;
+        camera.frame_height = device.spec.height;
+
+        auto n = device.spec.framerate_numerator;
+        auto d = device.spec.framerate_denominator;
+        camera.fps = d ? n / d : 0;
 
         auto& buffer32 = sdl_devices.data32;
         auto& buffer8 = sdl_devices.data8;
@@ -482,12 +519,10 @@ namespace camera_usb
         
         auto start = SDL_GetTicksNS();
 
-        // TODO
-
-        /*if (!grab_frame_rgba(device, dst))
+        if (!grab_and_convert_frame_yuv(device, dst))
         {
-            img::fill(dst, img::to_pixel(0, 0, 255));
-        }*/
+            
+        }
 
         auto end = SDL_GetTicksNS();
 
@@ -540,10 +575,10 @@ namespace camera_usb
         {
             auto start = SDL_GetTicksNS();
 
-            /*if (grab_frame_rgba(device, device.rgba))
+            if (grab_and_convert_frame_yuv(device, device.view3))
             {
-                on_grab(device.rgba);
-            }*/
+                proc(device.view3);
+            }
 
             auto end = SDL_GetTicksNS();
 

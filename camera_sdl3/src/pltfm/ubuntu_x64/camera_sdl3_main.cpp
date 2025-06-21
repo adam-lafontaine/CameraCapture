@@ -1,6 +1,8 @@
 #include "../imgui_sdl3_ogl3/imgui_include.hpp"
 #include "../../camera_display/camera_display.hpp"
 
+#include <cstdio>
+
 namespace img = image;
 namespace cdsp = camera_display;
 
@@ -96,12 +98,13 @@ static void render_imgui_frame()
     ui_imgui::new_frame();
     ui_imgui::show_imgui_demo(mv::ui_state);
 
-    /*auto t = textures.get_imgui_texture(camera_texture_id);
-    auto w = camera_state.display.width;
-    auto h = camera_state.display.height;
+    auto t = mv::textures.get_imgui_texture(mv::camera_texture_id);
+    auto w = mv::camera_state.display.width;
+    auto h = mv::camera_state.display.height;
     auto scale = 1.0f;
-    texture_window("Camera", t, w, h, scale);*/
+    texture_window("Camera", t, w, h, scale);
 
+    ui_camera_controls_window(mv::camera_state);
 
     ui_imgui::render(mv::ui_state);
 
@@ -116,8 +119,8 @@ static bool main_init()
 {
     mv::ui_state.window_title = "USB Camera";
 
-    // fullscreen
-    mv::ui_state.window_width = 1000;
+    // fullscreen?
+    mv::ui_state.window_width = 1200;
     mv::ui_state.window_height = 800;
 
     if (!ui_imgui::init(mv::ui_state))
@@ -128,7 +131,7 @@ static bool main_init()
     set_window_icon(mv::ui_state.window);
     mv::textures = ogl_imgui::create_textures<mv::N_TEXTURES>();
 
-    //init_camera_display();
+    init_camera_display();
 
     return true;
 }
@@ -136,7 +139,7 @@ static bool main_init()
 
 static void main_close()
 {
-    //cdsp::close_async(mv::camera_state);
+    cdsp::close(mv::camera_state);
     ui_imgui::close(mv::ui_state);
     mb::destroy_buffer(mv::camera_buffer);
 }
@@ -144,14 +147,12 @@ static void main_close()
 
 static void main_loop()
 {
-    auto camera_texture = mv::textures.get_ogl_texture(mv::camera_texture_id);
-
     while(is_running())
     {
-        //ogl_imgui::render_texture(camera_texture);
-        render_imgui_frame();
+        auto camera_texture = mv::textures.get_ogl_texture(mv::camera_texture_id);
+        ogl_imgui::render_texture(camera_texture);
 
-        
+        render_imgui_frame();
     }
 }
 
@@ -165,10 +166,7 @@ int main()
 
     mv::run_state = RunState::Run;
 
-    while (is_running())
-    {
-        main_loop();
-    }
+    main_loop();
 
     main_close();
 

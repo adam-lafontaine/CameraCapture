@@ -63,6 +63,9 @@ namespace image
 
     ImageView make_view(u32 width, u32 height, Buffer32& buffer)
     {
+        assert(width);
+        assert(height);
+
         ImageView view{};
 
         view.matrix_data_ = mb::push_elements(buffer, width * height);
@@ -78,6 +81,8 @@ namespace image
 
     GrayView make_view(u32 width, u32 height, Buffer8& buffer)
     {
+        assert(width);
+        assert(height);
         GrayView view{};
 
         view.matrix_data_ = mb::push_elements(buffer, width * height);
@@ -516,6 +521,9 @@ namespace image
 
     View3u8 make_view_3(u32 width, u32 height, Buffer8& buffer)
     {
+        assert(width);
+        assert(height);
+
         View3u8 view{};
 
         make_view_n(view, width, height, buffer);
@@ -526,6 +534,9 @@ namespace image
 
     View4u8 make_view_4(u32 width, u32 height, Buffer8& buffer)
     {
+        assert(width);
+        assert(height);
+        
         View4u8 view{};
 
         make_view_n(view, width, height, buffer);

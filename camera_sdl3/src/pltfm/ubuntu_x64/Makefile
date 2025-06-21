@@ -31,18 +31,6 @@ exe := camera
 program_exe := $(build)/$(exe)
 
 
-#*** imgui ***
-
-imgui := $(libs)/imgui_1_92
-
-imgui_options_h := $(pltfm_imgui)/imgui_options.hpp
-
-imgui_include_h := $(pltfm_imgui)/imgui_include.hpp
-imgui_include_h += $(imgui_options_h)
-
-#**************
-
-
 #*** libs ***
 
 alloc_type := $(libs)/alloc_type
@@ -54,9 +42,17 @@ stb_image  := $(libs)/stb_image
 usb        := $(libs)/usb
 util       := $(libs)/util
 
-sdl        := $(libs)/sdl
-
 #************
+
+
+#*** imgui ***
+
+imgui_options_h := $(pltfm_imgui)/imgui_options.hpp
+
+imgui_include_h := $(pltfm_imgui)/imgui_include.hpp
+imgui_include_h += $(imgui_options_h)
+
+#**************
 
 
 #*** libs/util ***
@@ -124,21 +120,6 @@ span_c += $(span_h)
 #************
 
 
-#*** input ***
-
-input_h := $(input)/input.hpp
-input_h += $(types_h)
-input_h += $(input)/keyboard_input.hpp
-input_h += $(input)/mouse_input.hpp
-input_h += $(input)/controller_input.hpp
-
-
-input_state_h := $(input)/input_state.hpp
-input_state_h += $(input_h)
-
-#**************
-
-
 #*** image ***
 
 image_h := $(image)/image.hpp
@@ -153,46 +134,18 @@ image_c += $(stb_image_resize_h)
 #*************
 
 
-#*** sdl ***
-
-sdl_include_h := $(sdl)/sdl_include.hpp
-sdl_include_h += $(input_h)
-sdl_include_h += $(image_h)
-
-sdl_input_c := $(sdl)/sdl_input.cpp
-sdl_input_c += $(sdl_include_h)
-sdl_input_c += $(input_state_h)
-sdl_input_c += $(numeric_h)
-
-#**********
-
-
 #*** usb ***
 
 camera_usb_h := $(usb)/camera_usb.hpp
-#libuvc_h     := $(usb)/libuvc3.hpp
-#mem_uvc_h    := $(usb)/mem_uvc.hpp
 convert_h := $(image)/convert.hpp
 convert_c := $(image)/convert.cpp
 
 camera_usb_c := $(usb)/camera_sdl.cpp
 camera_usb_c += $(camera_usb_h)
 camera_usb_c += $(numeric_h)
-#camera_usb_c += $(libuvc_h)
-#camera_usb_c += $(mem_uvc_h)
-#camera_usb_c += $(usb)/mem_uvc.cpp
-#camera_usb_c += $(convert_h)
+camera_usb_c += $(convert_h)
 
 #**********
-
-
-#*** res ***
-
-res := $(src)/res
-
-res_image_cpp := $(res)/image/res.cpp
-
-#***********
 
 
 #*** diagnostics ***
@@ -222,21 +175,17 @@ main_o := $(build)/main.o
 obj    := $(main_o)
 
 main_dep := $(imgui_include_h)
-#main_dep += $(input_display_h)
 main_dep += $(diagnostics_h)
 main_dep += $(camera_display_h)
-#main_dep += $(sdl_include_h)
 
 # main_o.cpp
 main_dep += $(alloc_type_c)
 main_dep += $(image_c)
 main_dep += $(convert_c)
 main_dep += $(qsprintf)
-#main_dep += $(sdl_input_c)
 main_dep += $(span_c)
 main_dep += $(stb_image_options_h)
 main_dep += $(camera_display_c)
-#main_dep += $(input_display_c)
 main_dep += $(diagnostics_c)
 
 main_dep += $(camera_usb_c)

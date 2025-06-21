@@ -206,14 +206,18 @@ namespace convert
 
         for (u32 h = 0; h < height; h += 2)
         {
-            auto du1 = du + h * width;
-            auto du2 = du1 + 1;
-            auto du3 = du1 + width;
-            auto du4 = du3 + 1;
+            auto hw = h * width;
 
-            auto dv1 = dv + h * width;
+            auto du1 = du + hw;
+            auto dv1 = dv + hw;
+
+            auto du2 = du1 + 1;
             auto dv2 = dv1 + 1;
+
+            auto du3 = du1 + width;
             auto dv3 = dv1 + width;
+
+            auto du4 = du3 + 1;
             auto dv4 = dv3 + 1;
 
             for (u32 w = 0; w < width; w += 2)
@@ -310,14 +314,18 @@ namespace convert
 
         for (u32 h = 0; h < height; h += 2)
         {
-            auto du1 = du + h * width;
-            auto du2 = du1 + 1;
-            auto du3 = du1 + width;
-            auto du4 = du3 + 1;
+            auto hw = h * width;
 
-            auto dv1 = dv + h * width;
+            auto du1 = du + hw;
+            auto dv1 = dv + hw;
+
+            auto du2 = du1 + 1;
             auto dv2 = dv1 + 1;
+
+            auto du3 = du1 + width;
             auto dv3 = dv1 + width;
+
+            auto du4 = du3 + 1;            
             auto dv4 = dv3 + 1;
 
             for (u32 w = 0; w < width; w += 2)
@@ -725,7 +733,7 @@ namespace convert
     static void yv12_to_yuv(SpanView<u8> const& src, u32 width, u32 height, ViewYUV const& dst, PixelFormat format)
     { 
         //                  |--- yv12 y ---| |--------- yv12 u --------| |--------- yv12 v --------|
-        assert(src.length == width * height + (width / 2) * (width / 2) + (width / 2) * (width / 2) );
+        assert(src.length == width * height + (width / 2) * (height / 2) + (width / 2) * (height / 2) );
 
         img::View1u8 src_y{};
         src_y.width = width;

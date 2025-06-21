@@ -330,13 +330,13 @@ namespace camera_usb
             return false;
         }
 
-        qsnprintf(device.product_id, 5, "%04x", desc->idProduct);
-        qsnprintf(device.vendor_id, 5, "%04x", desc->idVendor);
-        qsnprintf(device.serial_number, 32, "%s", desc->serialNumber);        
+        stb::qsnprintf(device.product_id, 5, "%04x", desc->idProduct);
+        stb::qsnprintf(device.vendor_id, 5, "%04x", desc->idVendor);
+        stb::qsnprintf(device.serial_number, 32, "%s", desc->serialNumber);        
             
         uvc::uvc_free_device_descriptor(desc);
 
-        qsnprintf(device.label, 32, "%c", 'A');
+        stb::qsnprintf(device.label, 32, "%c", 'A');
 
         return true;
     }

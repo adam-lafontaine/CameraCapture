@@ -238,7 +238,7 @@ namespace camera_display
         for (u32 i = 0; i < state.cameras.count; i++)
         {
             auto& camera = state.cameras.list[i];
-            open_camera(camera);
+            cam::open_camera(camera);
         }
     }
 
@@ -361,6 +361,12 @@ namespace camera_display
         std::thread th([&](){ init_cameras(state); });
 
         th.detach();
+    }
+
+
+    void close(CameraState& state)
+    {
+        camera_usb::close(state.cameras);
     }
 
 

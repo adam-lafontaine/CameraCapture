@@ -27,6 +27,8 @@ namespace camera_display
 
     void init_async(CameraState& state);
 
+    void close(CameraState& state);
+
     void close_async(CameraState& state);
 
     void show_cameras(CameraState& state);

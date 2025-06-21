@@ -265,23 +265,28 @@ namespace ui_imgui
                 {
                 case SDLK_F4:
                 {
-                    state.cmd_end_program = true;
+                    if (alt)
+                    {
+                        state.cmd_end_program = true;
+                    }                    
                 } break;
-
-                #ifndef NDEBUG
 
                 case SDLK_RETURN:
                 case SDLK_KP_ENTER:
                 {
-                    state.is_fullscreen = !state.is_fullscreen;
-                    SDL_SetWindowFullscreen(window, state.is_fullscreen);
+                    if (alt)
+                    {
+                        state.is_fullscreen = !state.is_fullscreen;
+                        SDL_SetWindowFullscreen(window, state.is_fullscreen);
+                    }
+                    
                 } break;
 
+                #ifndef NDEBUG
                 case SDLK_ESCAPE:
                 {
                     state.cmd_end_program = true;
                 } break;
-
                 #endif
 
                 default:
