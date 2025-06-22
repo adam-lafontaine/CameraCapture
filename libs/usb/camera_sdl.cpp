@@ -174,36 +174,6 @@ namespace camera_usb
     }
 
 
-    static bool grab_frame_rgba(DeviceSDL& device, img::ImageView const& dst)
-    {
-        Uint64 ts = 0;
-        auto surface = SDL_AcquireCameraFrame(device.p_device, &ts);
-        if (!surface)
-        {
-            return false;
-        }
-
-        auto s = (u8*)surface->pixels;
-        auto w = (u32)surface->w;
-
-        auto src_row = span::make_view((img::Pixel*)s, w);
-
-        for (u32 y = 0; y < dst.height; y++)
-        {
-            img::row_span(dst, y);
-
-            span::copy_span(src_row, img::row_span(dst, y));
-
-            s += surface->pitch;
-            src_row = span::make_view((img::Pixel*)s, w);
-        }
-
-        SDL_ReleaseCameraFrame(device.p_device, surface);
-
-        return true;
-    }
-
-
     static bool grab_and_convert_frame_yuv(DeviceSDL& device, img::View3u8 const& dst)
     {
         Uint64 ts = 0;
@@ -223,6 +193,60 @@ namespace camera_usb
         auto format = cvt::PixelFormat::YV12;
 
         cvt::to_yuv(span, w, h, dst, format);
+
+        SDL_ReleaseCameraFrame(device.p_device, frame);
+
+        return true;
+    }
+
+
+    static bool grab_and_convert_frame_rgb(DeviceSDL& device, img::View3u8 const& dst)
+    {
+        Uint64 ts = 0;
+        SDL_Surface* frame = 0;
+        while (!frame)
+        {
+            frame = SDL_AcquireCameraFrame(device.p_device, &ts);
+        }
+
+        auto data = (u8*)frame->pixels;
+        auto w = (u32)frame->w;
+        auto h = (u32)frame->h;
+        auto len = w * h + w * h / 2;
+
+        auto span = span::make_view(data, len);
+
+        auto format = cvt::PixelFormat::YV12;
+
+        cvt::to_yuv(span, w, h, device.view3, format);
+        cvt::yuv_to_rgb(device.view3, dst);
+
+        SDL_ReleaseCameraFrame(device.p_device, frame);
+
+        return true;
+    }
+
+
+    static bool grab_and_convert_frame_rgba(DeviceSDL& device, img::ImageView const& dst)
+    {
+        Uint64 ts = 0;
+        SDL_Surface* frame = 0;
+        while (!frame)
+        {
+            frame = SDL_AcquireCameraFrame(device.p_device, &ts);
+        }
+
+        auto data = (u8*)frame->pixels;
+        auto w = (u32)frame->w;
+        auto h = (u32)frame->h;
+        auto len = w * h + w * h / 2;
+
+        auto span = span::make_view(data, len);
+
+        auto format = cvt::PixelFormat::YV12;
+
+        cvt::to_yuv(span, w, h, device.view3, format);
+        cvt::yuv_to_rgba(device.view3, dst);
 
         SDL_ReleaseCameraFrame(device.p_device, frame);
 
@@ -418,7 +442,7 @@ namespace camera_usb
 
         auto start = SDL_GetTicksNS();
 
-        if (!grab_frame_rgba(device, dst))
+        if (!grab_and_convert_frame_rgba(device, dst))
         {
             img::fill(dst, img::to_pixel(0, 0, 255));
         }
@@ -445,7 +469,7 @@ namespace camera_usb
         {
             auto start = SDL_GetTicksNS();
 
-            if (!grab_frame_rgba(device, dst))
+            if (!grab_and_convert_frame_rgba(device, dst))
             {
                 img::fill(dst, img::to_pixel(0, 0, 255));
             }
@@ -474,7 +498,7 @@ namespace camera_usb
         {
             auto start = SDL_GetTicksNS();
 
-            if (grab_frame_rgba(device, device.rgba))
+            if (grab_and_convert_frame_rgba(device, device.rgba))
             {
                 on_grab(device.rgba);
             }
@@ -497,12 +521,10 @@ namespace camera_usb
         
         auto start = SDL_GetTicksNS();
 
-        // TODO
-
-        /*if (!grab_frame_rgba(device, dst))
+        if (!grab_and_convert_frame_rgb(device, dst))
         {
-            img::fill(dst, img::to_pixel(0, 0, 255));
-        }*/
+            
+        }
 
         auto end = SDL_GetTicksNS();
 
@@ -547,10 +569,10 @@ namespace camera_usb
         {
             auto start = SDL_GetTicksNS();
 
-            /*if (grab_frame_rgba(device, device.rgba))
+            if (grab_and_convert_frame_rgb(device, device.view3))
             {
-                on_grab(device.rgba);
-            }*/
+                proc(device.view3);
+            }
 
             auto end = SDL_GetTicksNS();
 
