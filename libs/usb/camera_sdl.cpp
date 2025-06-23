@@ -66,6 +66,8 @@ namespace camera_usb
         SDL_Camera* p_device = 0;
         SDL_CameraSpec spec;
 
+        cstr name = 0;
+
         char format_code[5] = { 0 };
 
         f32 grab_ns;
@@ -281,7 +283,6 @@ namespace camera_usb
         for (int i = 0; i < count; i++)
         {
             auto id = ids[i];
-            printf("ID: %u\n", id);
             if (!id)
             {
                 continue;
@@ -289,6 +290,9 @@ namespace camera_usb
 
             auto& device = list.devices[list.count];
             device.device_id = id;
+
+            auto name = SDL_GetCameraName(id);
+            device.name = name ? name : "XXXX";
 
             list.count++;
         }
@@ -373,7 +377,7 @@ namespace camera_usb
 
             // TODO
             camera.vendor = span::to_string_view("XXXX");
-            camera.product = span::to_string_view("XXXX");
+            camera.product = span::to_string_view(device.name);
             camera.serial_number = span::to_string_view("XXXX");
             camera.label = span::to_string_view("XXXX");
 
