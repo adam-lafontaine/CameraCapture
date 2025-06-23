@@ -66,6 +66,8 @@ namespace camera_usb
         SDL_Camera* p_device = 0;
         SDL_CameraSpec spec;
 
+        char format_code[5] = { 0 };
+
         f32 grab_ns;
 
         img::ImageView rgba;
@@ -156,13 +158,16 @@ namespace camera_usb
             return false;
         }
 
-        /*if (!SDL_GetCameraFormat(camera, &device.spec))
+        SDL_CameraSpec spec;
+
+        if (!SDL_GetCameraFormat(camera, &spec))
         {
             return false;
-        }*/
+        }
 
         device.p_device = camera;
-        device.spec = format;
+        device.spec = spec;
+        cvt::u32_to_fcc((u32)spec.format, device.format_code);
 
         return true;
     }
@@ -190,7 +195,8 @@ namespace camera_usb
 
         auto span = span::make_view(data, len);
 
-        auto format = cvt::PixelFormat::YV12;
+        auto format = (cvt::PixelFormat)frame->format;
+        assert(format == cvt::PixelFormat::YV12);
 
         cvt::to_yuv(span, w, h, dst, format);
 
@@ -216,12 +222,14 @@ namespace camera_usb
 
         auto span = span::make_view(data, len);
 
-        auto format = cvt::PixelFormat::YV12;
+        auto format = (cvt::PixelFormat)frame->format;
+        assert(format == cvt::PixelFormat::YV12);
 
         cvt::to_yuv(span, w, h, device.view3, format);
-        cvt::yuv_to_rgb(device.view3, dst);
 
         SDL_ReleaseCameraFrame(device.p_device, frame);
+
+        cvt::yuv_to_rgb(device.view3, dst);
 
         return true;
     }
@@ -427,6 +435,8 @@ namespace camera_usb
             camera.busy = 0;
             return false;
         }
+
+        camera.format = span::to_string_view(device.format_code);
 
         camera.status = CameraStatus::Open;
         camera.busy = 0;
