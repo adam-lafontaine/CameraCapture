@@ -45,6 +45,7 @@ build  := $(camera)/build/win
 src    := $(camera)/src
 
 pltfm := $(src)/pltfm/win_sdl_dx11
+pltfm_imgui := $(src)/pltfm/imgui_dx11_ogl3
 
 libs := $(root)/libs
 
@@ -64,17 +65,14 @@ stb_image  := $(libs)/stb_image
 usb        := $(libs)/usb
 util       := $(libs)/util
 
-sdl        := $(libs)/sdl
-
 #************
 
 
 #*** imgui ***
 
-imgui := $(pltfm)
-imgui_options_h := $(imgui)/imgui_options.hpp
+imgui_options_h := $(pltfm_imgui)/imgui_options.hpp
 
-imgui_include_h := $(imgui)/imgui_include.hpp
+imgui_include_h := $(pltfm_imgui)/imgui_include.hpp
 imgui_include_h += $(imgui_options_h)
 
 #**************
@@ -145,21 +143,6 @@ span_c += $(span_h)
 #************
 
 
-#*** input ***
-
-input_h := $(input)/input.hpp
-input_h += $(types_h)
-input_h += $(input)/keyboard_input.hpp
-input_h += $(input)/mouse_input.hpp
-input_h += $(input)/controller_input.hpp
-
-
-input_state_h := $(input)/input_state.hpp
-input_state_h += $(input_h)
-
-#**************
-
-
 #*** image ***
 
 image_h := $(image)/image.hpp
@@ -174,20 +157,6 @@ image_c += $(stb_image_resize_h)
 #*************
 
 
-#*** sdl ***
-
-sdl_include_h := $(sdl)/sdl_include.hpp
-sdl_include_h += $(input_h)
-sdl_include_h += $(image_h)
-
-sdl_input_c := $(sdl)/sdl_input.cpp
-sdl_input_c += $(sdl_include_h)
-sdl_input_c += $(input_state_h)
-sdl_input_c += $(numeric_h)
-
-#**********
-
-
 #*** usb ***
 
 camera_usb_h := $(usb)/camera_usb.hpp
@@ -199,28 +168,6 @@ camera_usb_c += $(camera_usb_h)
 camera_usb_c += $(convert_h)
 
 #**********
-
-
-#*** input_display ***
-
-input_display := $(src)/input_display
-
-input_display_h := $(input_display)/input_display.hpp
-input_display_h += $(input_h)
-input_display_h += $(image_h)
-
-input_display_c := $(input_display)/input_display.cpp
-
-#***************
-
-
-#*** res ***
-
-res := $(src)/res
-
-res_image_cpp := $(res)/image/res.cpp
-
-#***********
 
 
 #*** diagnostics ***
@@ -250,27 +197,20 @@ main_o := $(build)/main.o
 obj    := $(main_o)
 
 main_dep := $(imgui_include_h)
-main_dep += $(input_display_h)
 main_dep += $(diagnostics_h)
 main_dep += $(camera_display_h)
-main_dep += $(sdl_include_h)
 
 # main_o.cpp
 main_dep += $(alloc_type_c)
 main_dep += $(image_c)
 main_dep += $(convert_c)
-main_dep += $(qsprintf)
-main_dep += $(sdl_input_c)
+main_dep += $(qsprintf_c)
 main_dep += $(span_c)
 main_dep += $(stb_image_options_h)
 main_dep += $(camera_display_c)
-main_dep += $(input_display_c)
 main_dep += $(diagnostics_c)
 
 main_dep += $(camera_usb_c)
-
-# force recompile
-main_dep += $(res_image_cpp)
 
 #****************
 
