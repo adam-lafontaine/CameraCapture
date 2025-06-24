@@ -1,14 +1,9 @@
-#include "imgui_include.hpp"
+#include "../imgui_sdl2_dx11/imgui_include.hpp"
+#include "../../camera_display/camera_display.hpp"
 
 #ifndef NDEBUG
-#include "../../input_display/input_display.hpp"
 #include "../../diagnostics/diagnostics.hpp"
-
-namespace idsp = input_display;
 #endif
-
-#include "../../camera_display/camera_display.hpp"
-#include "../../../../libs/sdl/sdl_include.hpp"
 
 
 namespace img = image;
@@ -23,32 +18,7 @@ static void set_game_window_icon(SDL_Window* window)
 }
 
 
-static void ui_process_input(sdl::EventInfo& evt, input::Input const& prev, input::Input& curr, ui::UIState& state)
-{
-    //auto& io = *state.io;
-
-    // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-    // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-    // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-    // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-    
-    /*if (!io.WantCaptureKeyboard)
-    {
-        evt.has_event = true;
-        input::process_keyboard_input(evt, prev.keyboard, curr.keyboard);
-        evt.first_in_queue = false;
-    }
-
-    if (!io.WantCaptureMouse)
-    {
-        evt.has_event = true;
-        input::process_mouse_input(evt, prev.mouse, curr.mouse);
-        evt.first_in_queue = false;
-    }*/
-}
-
-
-static void texture_window(cstr title, void* texture, u32 width, u32 height, f32 scale)
+static void texture_window(cstr title, ImTextureID image_texture, u32 width, u32 height, f32 scale)
 {
     auto w = width * scale;
     auto h = height * scale;
@@ -81,37 +51,17 @@ enum class RunState : int
 
 /* main variables */
 
-namespace
+namespace mv
 {    
-    input::Input user_input[2] = {};
-    sdl::ControllerInput sdl_controller = {};
-    u8 input_id_curr = 0;
-    u8 input_id_prev = 1;
+    RunState run_state = RunState::Begin;
+    ui_imgui::UIState ui_state{};
+
+    constexpr u32 N_TEXTURES = 1;
     
     cdsp::CameraState camera_state{};
     img::Buffer32 camera_buffer;
     
-    constexpr dx11::TextureId camera_texture_id = { 0 };    
-
-    ui::UIState ui_state{};
-    SDL_Window* window = 0;
-    
-    RunState run_state = RunState::Begin;
-
-#ifndef NDEBUG
-
-    idsp::IOState io_state{};
-    constexpr dx11::TextureId input_texture_id = { 1 };
-    constexpr u32 N_TEXTURES = 2;
-
-#else
-
-    constexpr u32 N_TEXTURES = 1;
-
-#endif
-
-    dx11::Context dx_ctx;
-    dx11::TextureList<N_TEXTURES> textures;
+    constexpr dx11::TextureId camera_texture_id = { 0 };
 }
 
 
@@ -163,26 +113,6 @@ static void end_program()
 static bool is_running()
 {
     return run_state != RunState::End;
-}
-
-
-static void init_input()
-{
-    sdl::open_game_controllers(sdl_controller, user_input[0]);
-    user_input[1].num_controllers = user_input[0].num_controllers;
-    user_input[0].frame = user_input[1].frame = (u64)0 - 1;
-}
-
-
-static void swap_inputs()
-{
-    input_id_prev = input_id_curr;
-    input_id_curr = !input_id_curr;
-
-    auto& input = user_input[input_id_curr];
-    auto& input_prev = user_input[input_id_prev];
-
-    input::copy_input(input_prev, input);
 }
 
 
@@ -260,62 +190,20 @@ static void handle_window_event(SDL_Event const& event, SDL_Window* window)
 }
 
 
-static void process_user_input()
-{
-    swap_inputs();
-
-    auto& input = user_input[input_id_curr];
-    auto& input_prev = user_input[input_id_prev];
-
-    input.frame = input_prev.frame + 1;
-
-    sdl::EventInfo evt{};
-    evt.has_event = false;
-
-    // Poll and handle events (inputs, window resize, etc.)
-    while (SDL_PollEvent(&evt.event))
-    {
-        handle_window_event(evt.event, window);
-        ImGui_ImplSDL2_ProcessEvent(&evt.event);
-
-        evt.has_event = true;
-
-        input::process_keyboard_input(evt, input_prev.keyboard, input.keyboard);
-        input::process_mouse_input(evt, input_prev.mouse, input.mouse);        
-    }
-
-    input::process_controller_input(sdl_controller, input_prev, input);
-
-    ui_process_input(evt, input_prev, input, ui_state);    
-}
-
-
 static void render_imgui_frame()
 {
-    // Start the Dear ImGui frame
-    ImGui_ImplDX11_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
-
-    // Rendering
-    ImGui::DockSpaceOverViewport(nullptr, ImGuiDockNodeFlags_None);
-
-#ifdef SHOW_IMGUI_DEMO
-    ui::show_imgui_demo(ui_state);
-#endif
-
-#ifndef NDEBUG
-    texture_window("Input", textures.get_imgui_texture(input_texture_id), io_state.display.width, io_state.display.height, 2.0f);
-    diagnostics::show_diagnostics();
-#endif
+    ui_imgui::new_frame();
+    ui_imgui::show_imgui_demo(mv::ui_state);
     
-    texture_window("Camera", textures.get_imgui_texture(camera_texture_id), camera_state.display.width, camera_state.display.height, 1.0f);
-    ui_camera_controls_window(camera_state);
+    auto t = mv::textures.get_im_texture_id(mv::camera_texture_id);
+    auto w = mv::camera_state.display.width;
+    auto h = mv::camera_state.display.height;
+    auto scale = 1.0f;
+    texture_window("Camera", t, w, h, scale);
 
-    ImGui::Render();
+    ui_camera_controls_window(mv::camera_state);
 
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    dx11::render(dx_ctx, clear_color);    
+    ui_imgui::render(mv::ui_state);    
 }
 
 
