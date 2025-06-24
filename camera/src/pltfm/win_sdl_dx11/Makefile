@@ -1,7 +1,7 @@
 GPP := g++
 
 GPP += -std=c++20
-GPP += -mavx
+GPP += -mavx -mavx2 -mfma
 #GPP += -O3
 #GPP += -DNDEBUG
 GPP += -mwindows
@@ -45,7 +45,7 @@ build  := $(camera)/build/win
 src    := $(camera)/src
 
 pltfm := $(src)/pltfm/win_sdl_dx11
-pltfm_imgui := $(src)/pltfm/imgui_dx11_ogl3
+pltfm_imgui := $(src)/pltfm/imgui_sdl2_dx11
 
 libs := $(root)/libs
 
@@ -217,7 +217,7 @@ main_dep += $(camera_usb_c)
 
 #*** imgui cpp ***
 
-imgui_c := $(imgui)/imgui_o.cpp
+imgui_c := $(pltfm_imgui)/imgui_o.cpp
 imgui_o := $(build)/imgui.o
 obj     += $(imgui_o)
 

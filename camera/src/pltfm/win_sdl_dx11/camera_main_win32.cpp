@@ -14,7 +14,7 @@ namespace cdsp = camera_display;
 static void set_window_icon(SDL_Window* window)
 {
 #include "../../../../resources/icon_64.c" // this will "paste" the struct my_icon into this function
-    sdl::set_window_icon(window, icon_64);
+    ui_imgui::set_window_icon(window, icon_64);
 }
 
 
