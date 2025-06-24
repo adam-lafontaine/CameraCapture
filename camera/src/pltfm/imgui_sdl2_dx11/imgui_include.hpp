@@ -267,9 +267,10 @@ namespace ui_imgui
         auto& ctx = state.dx_context;
 
         const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
-        
+        ImGui::Render();
         ctx.pd3dDeviceContext->OMSetRenderTargets(1, &ctx.mainRenderTargetView, nullptr);
         ctx.pd3dDeviceContext->ClearRenderTargetView(ctx.mainRenderTargetView, clear_color_with_alpha);
+
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
         ctx.pSwapChain->Present(1, 0); // Present with vsync

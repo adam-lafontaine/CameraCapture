@@ -10,7 +10,6 @@ namespace img = image;
 namespace cdsp = camera_display;
 
 
-
 static void set_window_icon(SDL_Window* window)
 {
 #include "../../../../resources/icon_64.c" // this will "paste" the struct my_icon into this function
@@ -109,7 +108,7 @@ static void render_imgui_frame()
 
     ui_camera_controls_window(mv::camera_state);
 
-    ui_imgui::render(mv::ui_state);    
+    ui_imgui::render(mv::ui_state);
 }
 
 
@@ -150,8 +149,7 @@ static void main_loop()
 
     while(is_running())
     {
-        ui_imgui::handle_sdl_events(mv::ui_state);        
-        
+        ui_imgui::handle_sdl_events(mv::ui_state);          
         dx11_imgui::render_texture(camera_texture, ctx);
 
         render_imgui_frame();
