@@ -118,7 +118,7 @@ static bool main_init()
 
     // fullscreen?
     mv::ui_state.window_width = 1200;
-    mv::ui_state.window_height = 800;
+    mv::ui_state.window_height = 700;
 
     if (!ui_imgui::init(mv::ui_state))
     {

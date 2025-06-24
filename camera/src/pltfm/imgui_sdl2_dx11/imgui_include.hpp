@@ -106,18 +106,6 @@ namespace dx
     }
 
 
-    static void render(Context& ctx, ImVec4 clear_color)
-    {
-        const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
-        
-        ctx.pd3dDeviceContext->OMSetRenderTargets(1, &ctx.mainRenderTargetView, nullptr);
-        ctx.pd3dDeviceContext->ClearRenderTargetView(ctx.mainRenderTargetView, clear_color_with_alpha);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-        ctx.pSwapChain->Present(1, 0); // Present with vsync
-        //ctx.pSwapChain->Present(0, 0); // Present without vsync
-    }
-
 } // dx
 }
 
@@ -272,6 +260,13 @@ namespace ui_imgui
         ctx.pd3dDeviceContext->ClearRenderTargetView(ctx.mainRenderTargetView, clear_color_with_alpha);
 
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+        // Update and Render additional Platform Windows
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+        }
 
         ctx.pSwapChain->Present(1, 0); // Present with vsync
         //ctx.pSwapChain->Present(0, 0); // Present without vsync
