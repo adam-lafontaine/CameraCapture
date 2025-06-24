@@ -336,8 +336,7 @@ namespace ui_imgui
             }
 
             auto& ctx = state.dx_context;
-
-            // TODO
+            
             int w, h;
             SDL_GetWindowSize(state.window, &w, &h);
 
@@ -378,8 +377,11 @@ namespace ui_imgui
                 {
                     if (alt)
                     {
+                        // TODO: broken
+                        //SDL_WINDOW_FULLSCREEN
+                        //auto flags = state.is_fullscreen ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
+                        //SDL_SetWindowFullscreen(window, flags);
                         //state.is_fullscreen = !state.is_fullscreen;
-                        //SDL_SetWindowFullscreen(window, state.is_fullscreen);
                         assert(false && "TODO: toggle fullscreen");
                     }
                     
