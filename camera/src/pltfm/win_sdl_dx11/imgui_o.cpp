@@ -1,6 +1,11 @@
-#include "imgui_options.hpp"
+#include "../../../../libs/alloc_type/alloc_type.cpp"
+#include "../../../../libs/image/image.cpp"
+#include "../../../../libs/qsprintf/qsprintf.cpp"
+#include "../../../../libs/span/span.cpp"
+#include "../../../../libs/stb_image/stb_image_options.hpp"
 
-#include "../../../../libs/imgui_1_89/misc/single_file/imgui_single_file.cpp"
+#include "../../camera_display/camera_display.cpp"
+#include "../../diagnostics/diagnostics.cpp"
 
-#include "../../../../libs/imgui_1_89/backends/imgui_impl_sdl2.cpp"
-#include "../../../../libs/imgui_1_89/backends/imgui_impl_dx11.cpp"
+#include "../../../../libs/usb/camera_uvc.cpp"
+#include "../../../../libs/image/convert.cpp"

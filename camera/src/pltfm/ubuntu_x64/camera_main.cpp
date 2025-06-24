@@ -109,8 +109,6 @@ static void render_imgui_frame()
     ui_camera_controls_window(mv::camera_state);
 
     ui_imgui::render(mv::ui_state);
-
-    
 }
 
 
