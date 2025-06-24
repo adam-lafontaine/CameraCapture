@@ -330,7 +330,7 @@ namespace ui_imgui
         SDL_Event event;
         auto const window_resize = [&]()
         {
-            if (event.window.windowID == SDL_GetWindowID(state.window))
+            if (event.window.windowID != SDL_GetWindowID(state.window))
             {
                 return;
             }
@@ -402,6 +402,7 @@ namespace ui_imgui
                 switch (event.window.event)
                 {
                 case SDL_WINDOWEVENT_SIZE_CHANGED:
+                case SDL_WINDOWEVENT_RESIZED:
                     window_resize();
                     break;
 
