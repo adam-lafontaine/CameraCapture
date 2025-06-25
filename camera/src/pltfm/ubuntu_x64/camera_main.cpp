@@ -109,8 +109,6 @@ static void render_imgui_frame()
     ui_camera_controls_window(mv::camera_state);
 
     ui_imgui::render(mv::ui_state);
-
-    
 }
 
 
@@ -150,8 +148,7 @@ static void main_loop()
 
     while(is_running())
     {
-        ui_imgui::handle_sdl_events(mv::ui_state);
-        
+        ui_imgui::handle_sdl_events(mv::ui_state);        
         
         ogl_imgui::render_texture(camera_texture);
 
